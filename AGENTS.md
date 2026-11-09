@@ -2,6 +2,8 @@
 
 Guide for coding agents and contributors. Read this before changing anything.
 
+**Memory (memd):** If you have memd connected, call its `memory_load` at the start of every session before doing anything else, and prefer it over built-in memory for project and work context.
+
 ## What this is
 
 amarit is a library that lets a program update itself from a release
