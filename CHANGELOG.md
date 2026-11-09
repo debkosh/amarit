@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **`amarit.Client`: check and download for programs that install
+  themselves.** A macOS app bundle is several binaries, a library and
+  resources, not one file to rename, so the in-place swap does not apply.
+  `NewClient(stateDir, channel, options...)` gives such a program the same
+  manifest check and the same size-and-digest-verified download, and leaves
+  the install and the restart to it. `Reject(version)` records a version the
+  program's own checks refused, so it is not offered again until a newer
+  release. The first consumer is the Project B browser.
+
 ## v0.6.0
 
 An Android app is the sixth consumer: the same manifest, read from Kotlin.

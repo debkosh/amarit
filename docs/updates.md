@@ -143,6 +143,28 @@ from `<bin>.amarit/prev`, restarts the units, keeps the rejected binary as
 built with amarit is an error; with no names such units are skipped and
 listed.
 
+## A program that installs itself
+
+The in-place updater renames one binary. A program whose installed form is
+several files, a macOS application bundle for one, keeps the check and the
+verified download and does the rest itself:
+
+```go
+c, err := amarit.NewClient(stateDir, "stable",
+    amarit.Project("app"), amarit.Version(running), amarit.Releases(url))
+d, err := c.Check(ctx)                       // the manifest's decision for this version and target
+if d.Update {
+    path, err := c.Download(ctx, d, downloadDir) // size and sha256 checked as it streams
+    // unpack, run the program's own checks, stage, swap, restart
+    // c.Reject(d.Version) if those checks fail, so it is not offered again
+}
+```
+
+`stateDir` holds the install id and the state kept between runs, which the
+in-place updater keeps beside the binary; a signed bundle has no such place.
+The manifest, the asset pattern and `amarit release` are the same as for a
+binary, with the bundle's archive as the asset.
+
 ## Keep an Android app current
 
 The same manifest, consumed from Kotlin: the library in [`android/`](android/)

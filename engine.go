@@ -25,9 +25,10 @@ type Updater struct {
 	cfg    Config
 	opts   Options
 	client *http.Client
-	exe    string   // the running executable, symlinks resolved
+	exe    string   // the running executable, symlinks resolved; empty for a Client
 	argv   []string // os.Args as the process was started, before Run stripped its flags
 	target string   // "darwin/arm64"
+	state  string   // the sidecar directory; empty means <exe>.amarit
 	execFn func(bin string, argv, env []string) error
 }
 
@@ -133,7 +134,10 @@ func (u *Updater) open(ctx context.Context, raw string) (io.ReadCloser, error) {
 // sidecar is the one directory amarit keeps beside the binary: state.json,
 // the install id, and the previous binary.
 func (u *Updater) sidecar() string {
-	dir := u.exe + ".amarit"
+	dir := u.state
+	if dir == "" {
+		dir = u.exe + ".amarit"
+	}
 	_ = os.MkdirAll(dir, 0o755)
 	return dir
 }
@@ -250,6 +254,9 @@ func (u *Updater) Apply(ctx context.Context, d *Decision) error {
 	if !d.Update {
 		return errors.New("nothing to apply")
 	}
+	if u.exe == "" {
+		return errors.New("amarit: a Client downloads only; the program installs")
+	}
 	unlock, err := lockFile(filepath.Join(u.sidecar(), "lock"))
 	if err != nil {
 		return fmt.Errorf("lock: %w", err)
@@ -292,7 +299,7 @@ func (u *Updater) Apply(ctx context.Context, d *Decision) error {
 // attempt, keep the running binary as prev. Nothing is touched before
 // every check has passed; a failed swap leaves the state as it was.
 func (u *Updater) swap(ctx context.Context, d *Decision) error {
-	tmp, err := u.download(ctx, d.Asset)
+	tmp, err := u.download(ctx, d.Asset, filepath.Dir(u.exe), filepath.Base(u.exe)+".new-")
 	if err != nil {
 		return err
 	}
@@ -323,9 +330,10 @@ func (u *Updater) swap(ctx context.Context, d *Decision) error {
 	return nil
 }
 
-// download streams the asset into the executable's own directory, hashing
-// as it goes, so the later swap is a rename on the same filesystem.
-func (u *Updater) download(ctx context.Context, a Asset) (string, error) {
+// download streams the asset into dir as a file named prefix plus a random
+// suffix, hashing as it goes. The in-place updater uses the executable's own
+// directory, so the later swap is a rename on the same filesystem.
+func (u *Updater) download(ctx context.Context, a Asset, dir, prefix string) (string, error) {
 	src, err := u.assetURL(a)
 	if err != nil {
 		return "", fmt.Errorf("download: %w", err)
@@ -335,7 +343,7 @@ func (u *Updater) download(ctx context.Context, a Asset) (string, error) {
 		return "", fmt.Errorf("download: %w", err)
 	}
 	defer body.Close()
-	f, err := os.CreateTemp(filepath.Dir(u.exe), filepath.Base(u.exe)+".new-*")
+	f, err := os.CreateTemp(dir, prefix+"*")
 	if err != nil {
 		return "", fmt.Errorf("download: %w", err)
 	}
