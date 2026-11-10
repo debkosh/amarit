@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.0
 
 - **`amarit.Client`: check and download for programs that install
   themselves.** A macOS app bundle is several binaries, a library and
