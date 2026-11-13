@@ -75,3 +75,15 @@ func (c *Client) Reject(version string) error {
 	st.Rejected = version
 	return c.u.saveState(st)
 }
+
+// Unreject forgets the version a Reject took out, so the next Check offers it
+// again. It is for a check a person asked for: an automatic check keeps
+// holding a refused release, but someone who presses "check" means "try it".
+func (c *Client) Unreject() error {
+	st := c.u.loadState()
+	if st.Rejected == "" {
+		return nil
+	}
+	st.Rejected = ""
+	return c.u.saveState(st)
+}

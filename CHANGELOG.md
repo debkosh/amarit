@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.1
+
+- **`Client.Unreject()`** forgets the version a `Reject` took out, so the next
+  `Check` offers it again. For a check a person asked for: automatic checks
+  keep holding a refused release.
+
 ## v0.7.0
 
 - **`amarit.Client`: check and download for programs that install

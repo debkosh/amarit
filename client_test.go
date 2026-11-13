@@ -82,3 +82,16 @@ func TestClientRejectHoldsUntilANewerRelease(t *testing.T) {
 		t.Fatalf("a newer release should be offered: %v %+v", err, d)
 	}
 }
+
+func TestClientUnrejectOffersTheVersionAgain(t *testing.T) {
+	c := testClient(t, manifestFor("0.6.0", "0.5.0", ""), assetBody, "0.5.0")
+	if err := c.Reject("0.6.0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Unreject(); err != nil {
+		t.Fatal(err)
+	}
+	if d, err := c.Check(context.Background()); err != nil || !d.Update {
+		t.Fatalf("an unrejected release should be offered: %v %+v", err, d)
+	}
+}
