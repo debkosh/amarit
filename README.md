@@ -25,6 +25,8 @@ and opens no ports. *Amar*: undying.
 curl -fsSL https://raw.githubusercontent.com/sudiptadeb/amarit/main/install.sh | sh
 ```
 
+Or with npm: `npm install -g amarit`.
+
 **2. Choose how amarit starts.** Do this once per machine.
 
 | You want | Run | What you get |

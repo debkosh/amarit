@@ -1,0 +1,21 @@
+{
+  "version": "0.7.0",
+  "assets": {
+    "darwin/amd64": {
+      "url": "https://github.com/sudiptadeb/amarit/releases/download/v0.7.0/amarit-darwin-amd64",
+      "sha256": "add2f9b03e377cf65f1f754a696f4d511e3ee988829fcfca12a6e745fe9ecf88"
+    },
+    "darwin/arm64": {
+      "url": "https://github.com/sudiptadeb/amarit/releases/download/v0.7.0/amarit-darwin-arm64",
+      "sha256": "987716a870c99b468be988734f3b315812e66d59d639c864b5daf298ea579074"
+    },
+    "linux/amd64": {
+      "url": "https://github.com/sudiptadeb/amarit/releases/download/v0.7.0/amarit-linux-amd64",
+      "sha256": "8b3edc8b05347323e8cac9fc5dbca7756841cc817755781fed3a521302a2ae65"
+    },
+    "linux/arm64": {
+      "url": "https://github.com/sudiptadeb/amarit/releases/download/v0.7.0/amarit-linux-arm64",
+      "sha256": "cc3be66cb2264971afcbeab0ddb39eed8825ba6751129b521b272592d04233c7"
+    }
+  }
+}

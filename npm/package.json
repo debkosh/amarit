@@ -1,0 +1,31 @@
+{
+  "name": "amarit",
+  "version": "0.7.0",
+  "description": "amarit: keep it alive, keep it current. Self-update from a release manifest, in-place or zero-downtime restart, health-gated rollback, and keep-alive under launchd, systemd or nothing.",
+  "bin": {
+    "amarit": "run.js"
+  },
+  "files": [
+    "run.js",
+    "assets.json"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "author": "Sudipta Deb",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sudiptadeb/amarit.git",
+    "directory": "npm"
+  },
+  "homepage": "https://github.com/sudiptadeb/amarit"
+}
