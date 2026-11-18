@@ -1,7 +1,7 @@
 #!/bin/sh
 # Cut a release of amarit itself: build every target with the version and
 # amarit.json stamped in, build the Android library's AAR, write SHA256SUMS
-# and releases.json, and publish them as a GitHub release. The manifest carries the earlier releases over
+# and releases.json, and publish them as a GitHub release. Then publish the npm package. The manifest carries the earlier releases over
 # from the one published last, so the channel never forgets a version.
 #
 #   ./release.sh v0.5.0
@@ -28,3 +28,6 @@ go run ./cmd/amarit release -version "$VERSION" -dist "$DIST" -out "$DIST/releas
 awk -v v="## $VERSION" '$0 == v {on = 1; next} /^## / {on = 0} on' CHANGELOG.md > "$NOTES"
 gh release create "$VERSION" "$DIST"/* --title "$VERSION" --notes-file "$NOTES"
 rm -f "$NOTES"
+
+# npm: the same release as an npm package (asks for 2FA in the browser).
+npm/publish.sh "$VERSION"

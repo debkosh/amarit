@@ -1,6 +1,6 @@
 {
   "name": "amarit",
-  "version": "0.7.0",
+  "version": "0.0.0",
   "description": "amarit: keep it alive, keep it current. Self-update from a release manifest, in-place or zero-downtime restart, health-gated rollback, and keep-alive under launchd, systemd or nothing.",
   "bin": {
     "amarit": "run.js"
