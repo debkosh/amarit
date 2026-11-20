@@ -3,17 +3,21 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -88,6 +92,7 @@ func writeJob(j job) error {
 
 func forgetJob(name string) {
 	os.Remove(jobPath(name))
+	os.Remove(waitSock(name))
 	os.Remove(ownLog(name))
 }
 
@@ -264,6 +269,9 @@ func keepJob(args []string) error {
 	if err := cmd.Start(); err != nil {
 		return fail(err)
 	}
+	// Listening before the record says the job runs, so a wait right after
+	// amarit job finds it.
+	waiters := listenWaiters(j.Name)
 	j.PID = cmd.Process.Pid
 	if err := writeJob(j); err != nil {
 		cmd.Process.Kill()
@@ -279,7 +287,85 @@ func keepJob(args []string) error {
 		fmt.Fprintf(log, "amarit job %s: %s\n", j.Name, end)
 	}
 	forgetJob(j.Name)
+	waiters(end)
 	return nil
+}
+
+// waitSock is where a running job's keeper answers `amarit wait`.
+func waitSock(name string) string { return filepath.Join(jobsDir(), name+".sock") }
+
+// listenWaiters takes `amarit wait` connections while the job runs; the
+// function it returns tells each how the job ended and closes them. Nothing
+// is kept: a waiter hears the end only while it is connected.
+func listenWaiters(name string) func(end string) {
+	os.Remove(waitSock(name))
+	ln, err := net.Listen("unix", waitSock(name))
+	if err != nil {
+		return func(string) {}
+	}
+	var mu sync.Mutex
+	var conns []net.Conn
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			conns = append(conns, c)
+			mu.Unlock()
+		}
+	}()
+	return func(end string) {
+		ln.Close()
+		os.Remove(waitSock(name))
+		mu.Lock()
+		defer mu.Unlock()
+		for _, c := range conns {
+			fmt.Fprintln(c, end)
+			c.Close()
+		}
+	}
+}
+
+// waitJob is `amarit wait N`: it blocks until the running job N ends,
+// prints how, and exits with its code; a job a signal ended exits 128 plus
+// the signal's number, as a shell reports it.
+func waitJob(args []string) error {
+	if len(args) != 1 {
+		return errors.New("usage: amarit wait <job>")
+	}
+	c, err := net.Dial("unix", waitSock(args[0]))
+	if err != nil {
+		return fmt.Errorf("no job named %s running", args[0])
+	}
+	defer c.Close()
+	line, err := bufio.NewReader(c).ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("job %s: its keeper ended without saying how", args[0])
+	}
+	end := strings.TrimSpace(line)
+	fmt.Printf("job %s: %s\n", args[0], end)
+	var code int
+	switch {
+	case strings.HasPrefix(end, "exit "):
+		code, _ = strconv.Atoi(strings.TrimPrefix(end, "exit "))
+	case strings.HasPrefix(end, "killed: "):
+		code = 128 + signalNumber(strings.TrimPrefix(end, "killed: "))
+	default:
+		code = 1
+	}
+	os.Exit(code)
+	return nil
+}
+
+func signalNumber(name string) int {
+	for n := syscall.Signal(1); n < 32; n++ {
+		if n.String() == name {
+			return int(n)
+		}
+	}
+	return 0
 }
 
 // ended words how a command ended: "exit N", or "killed: <signal>".

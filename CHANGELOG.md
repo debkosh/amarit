@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.10.1
+
+- **`amarit wait N`** blocks until the running job N ends and exits with
+  its code, so a script can start a job and later wait for it. The job's
+  keeper answers the waiters connected when it ends; amarit still keeps
+  nothing of a job afterwards.
+
 ## v0.10.0
 
 The system's own way of showing an app's updater. Guide: docs/appupdate.md.

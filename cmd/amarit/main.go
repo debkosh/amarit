@@ -60,6 +60,8 @@ func main() {
 		err = startJob(os.Args[2:])
 	case "jobs":
 		err = showJobs(os.Args[2:])
+	case "wait":
+		err = waitJob(os.Args[2:])
 	case "__job":
 		// Hidden: a job's keeper.
 		err = keepJob(os.Args[2:])
@@ -126,6 +128,7 @@ keep it alive (this machine):
                                    output and a last "amarit job N: exit 0" line to F; amarit
                                    forgets the job once it ends
   amarit jobs                      the jobs running now; amarit logs and stop take a job's name
+  amarit wait <job>                wait for a running job to end, and exit with its code
   amarit logs [-f] <unit>[@<i>]    a unit's output, or one instance's
   amarit stop <unit>[@<i>]         stop a unit, or one instance of it
   amarit start [-force] <unit>[@<i>]

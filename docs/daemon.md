@@ -67,6 +67,10 @@ amarit job [-name N] [-dir D] [-env-file F] [-log F] [--] <command> [args...]
 - `amarit jobs` lists the jobs running now; `amarit logs [-f] N` and `amarit
   stop N` take a job's name. Stop sends SIGTERM to the job's process group,
   and SIGKILL to what is left 10 s later.
+- `amarit wait N` blocks until the running job N ends, prints how, and
+  exits with its code (128 plus the signal's number for a job a signal
+  ended). The keeper tells every waiter connected when the job ends; nothing
+  is kept for a waiter that comes later.
 - `-log F` appends the output to F and, at the end, one line saying how it
   ended: `amarit job N: exit 3`, `amarit job N: killed: terminated`. A job
   without `-log` has its output in `~/.amarit/jobs/N.log` while it runs.

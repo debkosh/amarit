@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -133,3 +134,27 @@ func TestJobForgetsWhatAKilledKeeperLeft(t *testing.T) {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+// amarit wait blocks until the job ends and exits with its code.
+func TestJobWait(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, "home")
+	bin := buildAmarit(t, dir)
+	amaritCmd(t, bin, home, "job", "-name", "w", "--", "/bin/sh", "-c", "sleep 0.5; exit 7")
+	start := time.Now()
+	cmd := exec.Command(bin, "wait", "w")
+	cmd.Env = append(os.Environ(), "AMARIT_HOME="+home)
+	out, err := cmd.CombinedOutput()
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) || ee.ExitCode() != 7 || !strings.Contains(string(out), "exit 7") {
+		t.Fatalf("wait: %v %q", err, out)
+	}
+	if time.Since(start) < 300*time.Millisecond {
+		t.Fatal("wait returned before the job ended")
+	}
+	cmd = exec.Command(bin, "wait", "w")
+	cmd.Env = append(os.Environ(), "AMARIT_HOME="+home)
+	if out, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(out), "no job named w running") {
+		t.Fatalf("wait on an ended job: %v %q", err, out)
+	}
+}
