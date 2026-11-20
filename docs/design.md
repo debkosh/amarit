@@ -540,9 +540,10 @@ raise `UpdateAvailable`, which nothing has tested yet.
   and the same arguments, then the app quits. The new copy waits for the
   app's single-instance socket, not for a pid, since the pids live in
   different namespaces. Single instance stays the app's.
-- **Channels** are Flatpak branches (Sudipta's call, pending), which the
-  portal cannot switch: `SetChannel` returns an unsupported error, and the
-  app opens the other branch's `.flatpakref` for the software centre.
+- **No channels on Linux** (Sudipta, 2026-11-20: "linux we can only build
+  releases that too only when asked"): one Flatpak branch, stable.
+  `SetChannel` on this source returns an unsupported error, and the shell
+  shows no channel switch there.
 - **Rollback** is Flatpak's (`flatpak update --commit`), not amarit's.
 - **The presenter** is the Notification portal, not
   `org.freedesktop.Notifications`, since the app is sandboxed: a
