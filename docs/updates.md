@@ -208,6 +208,22 @@ section 3). On GitHub the manifest lives on the rolling pre-release
 skips pre-releases. One signing key for every channel, or the platform
 refuses the update.
 
+## Channels
+
+A manifest carries several channels, `"channels": {"stable": "0.3.8", "dev":
+"0.3.9-dev.202611201415"}`, and each copy follows one. A rolling channel,
+a build for every change that lands, names its builds so semver orders them:
+
+```sh
+V=$(amarit next-version -pre dev 0.3.8)   # 0.3.9-dev.<UTC minute>
+```
+
+The next patch with the channel and the minute sorts after 0.3.8, after
+every earlier dev build, and before 0.3.9, so a desktop copy on dev takes
+each build and then the release 0.3.9 when it ships. `0.3.8+g<sha>` does
+not work on the desktop: semver ignores build metadata for order, and the
+updater takes only a newer version.
+
 ## How an update runs
 
 ```

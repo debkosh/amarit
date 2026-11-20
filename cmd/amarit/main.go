@@ -4,6 +4,7 @@
 //	amarit stamp   [-config amarit.json] -version 0.5.3
 //	amarit release [-config amarit.json] -version 0.5.3 -dist dist [-channel stable] [-out releases.json]
 //	amarit release -version 0.2.1+g6c3c4d4 -version-code 3 -channel latest -asset app-latest.apk -url https://.../app-latest.apk -prune
+//	amarit next-version [-pre dev] 0.3.8
 //	amarit update  [-check] [-rolling] [unit|glob ...]
 package main
 
@@ -37,6 +38,8 @@ func main() {
 		err = stamp(os.Args[2:])
 	case "release":
 		err = release(os.Args[2:])
+	case "next-version":
+		err = nextVersion(os.Args[2:])
 	case "install":
 		err = install(os.Args[2:])
 	case "uninstall":
@@ -124,6 +127,8 @@ keep it current (release side):
                  [-version-code N]                               the APK versionCode; required for the android target
                  [-asset PATTERN] [-url PATTERN] [-prune]        this run's patterns over release.asset and release.url;
                                                                  -prune drops releases no channel points at
+  amarit next-version [-pre dev] X                               the name of a rolling build after release X:
+                                                                 0.3.9-dev.<UTC minute> after 0.3.8, which semver orders
 
 A program built with amarit updates itself: '<program> update' or '<program> --auto-update'.`)
 }
