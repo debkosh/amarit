@@ -31,7 +31,9 @@ type settings struct {
 }
 
 // NewClient resolves the configuration the way Start does, from the stamp
-// and the options, with no command line. It follows channel until a
+// and the options, with no command line. A build with no version is a
+// development build: it keeps the settings, and Check and Download say
+// ErrDevelopment. It follows channel until a
 // SetChannel in any copy sharing stateDir picks another. stateDir is
 // where the install id and the state kept between runs live; a bundle has
 // no "beside the binary" that survives a code signature, so the program
@@ -43,9 +45,6 @@ func NewClient(stateDir, channel string, options ...Option) (*Client, error) {
 	}
 	if cfg.Releases == "" {
 		return nil, errors.New("amarit: no releases URL")
-	}
-	if cfg.Version == "" {
-		return nil, errors.New("amarit: no version")
 	}
 	if stateDir == "" {
 		return nil, errors.New("amarit: no state directory")
@@ -70,6 +69,9 @@ func (c *Client) Version() string { return c.u.cfg.Version }
 // took out. It reads the channel each time, so a SetChannel in another copy
 // holds from that copy's next check.
 func (c *Client) Check(ctx context.Context) (*Decision, error) {
+	if c.u.cfg.Version == "" {
+		return nil, ErrDevelopment
+	}
 	u := *c.u
 	u.opts.Channel = c.Channel()
 	return u.Check(ctx)
@@ -157,6 +159,9 @@ func (c *Client) writeSettings(s settings) error {
 // StallAfter gave up on is ErrStalled, and one whose context was cancelled
 // with a cause returns that cause.
 func (c *Client) Download(ctx context.Context, d *Decision, dir string, opts ...DownloadOption) (string, error) {
+	if c.u.cfg.Version == "" {
+		return "", ErrDevelopment
+	}
 	if !d.Update {
 		return "", errors.New("nothing to download")
 	}

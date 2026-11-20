@@ -291,3 +291,21 @@ func TestSetChannelChecksIt(t *testing.T) {
 		t.Fatal("a channel with a space was taken")
 	}
 }
+
+// A development build's updater keeps the settings, never runs rounds, and
+// says so when asked to check.
+func TestADevelopmentBuildNeverUpdates(t *testing.T) {
+	c, err := amarit.NewClient(t.TempDir(), "stable", amarit.Project("demo"), amarit.Releases("http://127.0.0.1:1/releases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := New(Config{Client: c, Installer: &installer{dir: t.TempDir()}, Dir: t.TempDir(), Logf: t.Logf})
+	u.Start()
+	u.Check()
+	if s := u.State(); s.Phase != Failed || s.Kind != Development || s.Kind.Retryable() {
+		t.Fatalf("a development build's check: %+v", s)
+	}
+	if err := u.SetAutoUpdate(false); err != nil || u.State().AutoUpdate {
+		t.Fatalf("settings: %v %+v", err, u.State())
+	}
+}

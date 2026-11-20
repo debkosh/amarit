@@ -22,6 +22,9 @@ var (
 	// ErrNotWritable is an installed program that cannot be replaced where
 	// it is, such as a macOS app still on its disk image.
 	ErrNotWritable = errors.New("the installed program can't be replaced where it is")
+	// ErrDevelopment is a Client made with no version: a development build,
+	// which keeps the settings and never updates.
+	ErrDevelopment = errors.New("a development build doesn't update")
 )
 
 // DownloadOption tunes one Client.Download.

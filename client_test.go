@@ -26,15 +26,26 @@ func testClient(t *testing.T, manifest func(string) string, asset []byte, runnin
 	return c
 }
 
-func TestClientNeedsProjectVersionAndState(t *testing.T) {
+func TestClientNeedsProjectAndState(t *testing.T) {
 	if _, err := NewClient(t.TempDir(), "", Project("demo"), Version("1.0.0")); err == nil || !strings.Contains(err.Error(), "releases") {
 		t.Fatalf("want a releases error, got %v", err)
 	}
-	if _, err := NewClient(t.TempDir(), "", Project("demo"), Releases("http://x/releases.json")); err == nil || !strings.Contains(err.Error(), "version") {
-		t.Fatalf("want a version error, got %v", err)
-	}
 	if _, err := NewClient("", "", Project("demo"), Version("1.0.0"), Releases("http://x/releases.json")); err == nil || !strings.Contains(err.Error(), "state") {
 		t.Fatalf("want a state error, got %v", err)
+	}
+}
+
+// A development build, with no version, keeps the settings and never checks.
+func TestClientWithNoVersionIsADevelopmentBuild(t *testing.T) {
+	c, err := NewClient(t.TempDir(), "", Project("demo"), Releases("http://x/releases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Check(context.Background()); !errors.Is(err, ErrDevelopment) {
+		t.Fatalf("check: %v", err)
+	}
+	if err := c.SetChannel("dev"); err != nil || c.Channel() != "dev" {
+		t.Fatalf("settings: %v %s", err, c.Channel())
 	}
 }
 

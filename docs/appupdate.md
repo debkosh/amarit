@@ -66,6 +66,7 @@ the next round tries again.
 | `refused` | the release's checks refused it: another version, a broken or foreign signature | no; Check tries it again |
 | `not-writable` | the app can't be replaced where it is | no |
 | `busy` | another copy's download is still stopping | no; Check again |
+| `development` | a build with no version, which never updates | no |
 
 Behaviour behind the table:
 
@@ -94,6 +95,10 @@ u.OnChange(func(s appupdate.State) { postToMain(func() { view.Show(s) }) })
 u.Start()
 // on a button: u.Check(), u.Cancel(), u.Retry(), u.Relaunch()
 ```
+
+A development build makes its client with no version. It keeps the
+settings, so a settings page works the same; `Start` runs no rounds, and
+Check fails with `development`.
 
 ## Installers
 
@@ -180,7 +185,8 @@ if ([response.notification.request.content.categoryIdentifier isEqualToString:@"
 
 amarit keeps the app's own notification categories beside its own.
 
-**Android**: the library's `UpdateNotification` shows the state the Go
+**Android**: the library's `UpdateNotification`, one plain Java file,
+shows the state the Go
 updater makes, as its JSON, as the system's notification: progress with
 Cancel while downloading, Install when ready, Try again after a failure a
 retry can help.
@@ -191,10 +197,21 @@ UpdateNotification.commands = UpdateNotification.Commands { name -> goUpdater.co
 UpdateNotification.show(context, stateJson)
 ```
 
-Its words are string resources (`amarit_downloading_app`, `amarit_ready`,
-`amarit_failed_text`, ...), which the app overrides with its own. The app
-asks for `POST_NOTIFICATIONS` on Android 13 and later. A tap while the app's
-process is gone opens the app.
+Its words are the string resources in `res/values/amarit_notification.xml`,
+which the app overrides with its own. The app asks for `POST_NOTIFICATIONS`
+on Android 13 and later. A tap while the app's process is gone opens the app.
+
+A build without Gradle, such as Chromium's GN, takes it as source:
+`android/amarit/src/main/java/io/github/sudiptadeb/amarit/UpdateNotification.java`,
+`android/amarit/src/main/res/values/amarit_notification.xml` (its resources
+in the package `io.github.sudiptadeb.amarit`), and the receiver in the app's
+manifest:
+
+```xml
+<receiver android:name="io.github.sudiptadeb.amarit.UpdateNotification$Receiver" android:exported="false" />
+```
+
+It needs only the platform's APIs, no Kotlin and no other library.
 
 `examples/macupdate` is an app that updates itself from a release it serves
 slowly, to see both on a Mac: `./build.sh`, then open `amarit demo.app`.

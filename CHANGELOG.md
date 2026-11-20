@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.10.3
+
+- **A Client with no version is a development build.** It keeps the
+  settings, so a settings page needs no made-up version or URL; `Check` and
+  `Download` return `ErrDevelopment`, and appupdate runs no rounds and fails
+  a check with kind `development`.
+- **Android's `UpdateNotification` is one plain Java file** with its words in
+  `res/values/amarit_notification.xml`, so a build without Gradle, such as
+  Chromium's GN, compiles it as source. Its receiver is now
+  `UpdateNotification$Receiver`, and its strings are `amarit_notification_*`.
+
 ## v0.10.2
 
 - **`relaunch.WaitExited` on Linux waits on pidfds** (`pidfd_open` and

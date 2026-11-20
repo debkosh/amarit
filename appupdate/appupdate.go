@@ -48,6 +48,7 @@ const (
 	NotWritable   Kind = "not-writable" // the app can't be replaced where it is
 	Busy          Kind = "busy"         // another copy's download is still stopping
 	InstallFailed Kind = "install"      // putting the release in place failed
+	Development   Kind = "development"  // a build with no version, which never updates
 )
 
 // Retryable says whether Retry is taken after a failure of this kind.
@@ -174,6 +175,10 @@ func (u *Updater) OnChange(f func(State)) { u.events.subscribe(f) }
 // Start begins a round every Interval: each offers a release another copy
 // staged and, with automatic updates on, checks.
 func (u *Updater) Start() {
+	if u.cfg.Client.Version() == "" {
+		u.cfg.Logf("appupdate: a development build doesn't update")
+		return
+	}
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if u.timer != nil {
@@ -341,6 +346,10 @@ func (u *Updater) takes(phases ...Phase) bool {
 // asked runs a check the person asked for: it waits for another copy's,
 // tries a refused or cancelled release again, and says how it went.
 func (u *Updater) asked() {
+	if u.cfg.Client.Version() == "" {
+		u.fail("", Development, amarit.ErrDevelopment)
+		return
+	}
 	u.set(func(st *State) { st.Phase, st.Kind, st.Error = Checking, "", "" })
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), u.cfg.LockWait)
@@ -539,6 +548,8 @@ func kindOf(err error, fallback Kind) Kind {
 		return Stalled
 	case errors.Is(err, amarit.ErrNotWritable):
 		return NotWritable
+	case errors.Is(err, amarit.ErrDevelopment):
+		return Development
 	}
 	return fallback
 }
