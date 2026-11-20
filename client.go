@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -152,12 +153,116 @@ func (c *Client) writeSettings(s settings) error {
 
 // Download fetches the decided asset into dir, checking its size and sha256
 // against the manifest as it streams, and returns the file's path. A failed
-// download leaves nothing behind.
-func (c *Client) Download(ctx context.Context, d *Decision, dir string) (string, error) {
+// download leaves nothing behind. A mismatch is ErrDamaged, a download
+// StallAfter gave up on is ErrStalled, and one whose context was cancelled
+// with a cause returns that cause.
+func (c *Client) Download(ctx context.Context, d *Decision, dir string, opts ...DownloadOption) (string, error) {
 	if !d.Update {
 		return "", errors.New("nothing to download")
 	}
-	return c.u.download(ctx, d.Asset, dir, c.u.cfg.Project+"-"+d.Version+"-")
+	return c.u.download(ctx, d.Asset, dir, c.u.cfg.Project+"-"+d.Version+"-", newWatch(opts))
+}
+
+// TryLock takes the state directory's lock, which one copy at a time holds
+// while it checks and downloads, when no other copy holds it. The lock ends
+// with the process, so a copy that dies cannot leave it behind.
+func (c *Client) TryLock() (unlock func(), ok bool, err error) {
+	if err := os.MkdirAll(c.u.state, 0o755); err != nil {
+		return nil, false, err
+	}
+	return tryLockFile(filepath.Join(c.u.state, "lock"))
+}
+
+// Lock takes the state directory's lock, waiting for a copy holding it until
+// ctx ends.
+func (c *Client) Lock(ctx context.Context) (unlock func(), err error) {
+	for {
+		unlock, ok, err := c.TryLock()
+		if err != nil || ok {
+			return unlock, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, context.Cause(ctx)
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+// Installing records that version is about to replace the running one, so
+// the starts of the new one can be counted: the rollback the in-place
+// updater gives a binary, for a program that installs itself.
+func (c *Client) Installing(version string) error {
+	return c.withState(func(st *state) {
+		st.Attempt, st.From = strings.TrimPrefix(version, "v"), strings.TrimPrefix(c.u.cfg.Version, "v")
+		st.Starts, st.Pending = 0, nil
+	})
+}
+
+// Started records that this process has started, and says whether the
+// program should roll back to the version before: after the release
+// Installing named has failed to start maxStartsBeforeRollback times. A
+// start fails when its process ends before any copy calls Healthy, so
+// several copies starting at once are not failures. Call it once, early.
+func (c *Client) Started() (rollBack bool, err error) {
+	running := strings.TrimPrefix(c.u.cfg.Version, "v")
+	err = c.withState(func(st *state) {
+		switch {
+		case st.Attempt == "":
+		case st.Attempt != running:
+			// The release never took over, or was rolled back already.
+			st.Attempt, st.From, st.Starts, st.Pending = "", "", 0, nil
+		default:
+			var alive []int
+			for _, pid := range st.Pending {
+				if processAlive(pid) {
+					alive = append(alive, pid)
+				} else {
+					st.Starts++
+				}
+			}
+			st.Pending = append(alive, os.Getpid())
+			rollBack = st.Starts >= maxStartsBeforeRollback
+		}
+	})
+	return rollBack, err
+}
+
+// Healthy records that the running version works, once the program has come
+// up far enough to say so: its starts are no longer counted.
+func (c *Client) Healthy() error {
+	running := strings.TrimPrefix(c.u.cfg.Version, "v")
+	return c.withState(func(st *state) {
+		if st.Attempt == running {
+			*st = state{Healthy: running, Rejected: st.Rejected}
+		}
+	})
+}
+
+// RolledBack records that the program put the version before back after
+// Started said to: the release is rejected, as Reject does, and not offered
+// again until a newer one.
+func (c *Client) RolledBack() error {
+	return c.withState(func(st *state) {
+		*st = state{Healthy: st.From, Rejected: st.Attempt}
+	})
+}
+
+// withState changes state.json under its own lock, so copies starting
+// together do not lose each other's writes. It is not the check lock, which
+// a copy holds for a whole download.
+func (c *Client) withState(f func(*state)) error {
+	if err := os.MkdirAll(c.u.state, 0o755); err != nil {
+		return err
+	}
+	unlock, err := lockFile(filepath.Join(c.u.state, "state.lock"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	st := c.u.loadState()
+	f(&st)
+	return c.u.saveState(st)
 }
 
 // Reject records that version as refused on this install, so Check does not

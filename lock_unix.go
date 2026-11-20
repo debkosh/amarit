@@ -21,3 +21,19 @@ func lockFile(path string) (func(), error) {
 	}
 	return func() { f.Close() }, nil
 }
+
+// tryLockFile takes the lock on path when nobody holds it.
+func tryLockFile(path string) (func(), bool, error) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		f.Close()
+		if err == syscall.EWOULDBLOCK {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return func() { f.Close() }, true, nil
+}

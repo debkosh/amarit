@@ -52,6 +52,10 @@ type state struct {
 	// Rejected is the version the last rollback took out. It is not taken
 	// again, or an unhealthy release would be retried every interval.
 	Rejected string `json:"rejected,omitempty"`
+	// Pending are the processes of a Client's program that started on the
+	// attempted version and have not been seen to end; one that ends before
+	// Healthy counts as a failed start.
+	Pending []int `json:"pending,omitempty"`
 }
 
 const (
@@ -299,7 +303,7 @@ func (u *Updater) Apply(ctx context.Context, d *Decision) error {
 // attempt, keep the running binary as prev. Nothing is touched before
 // every check has passed; a failed swap leaves the state as it was.
 func (u *Updater) swap(ctx context.Context, d *Decision) error {
-	tmp, err := u.download(ctx, d.Asset, filepath.Dir(u.exe), filepath.Base(u.exe)+".new-")
+	tmp, err := u.download(ctx, d.Asset, filepath.Dir(u.exe), filepath.Base(u.exe)+".new-", nil)
 	if err != nil {
 		return err
 	}
@@ -332,8 +336,11 @@ func (u *Updater) swap(ctx context.Context, d *Decision) error {
 
 // download streams the asset into dir as a file named prefix plus a random
 // suffix, hashing as it goes. The in-place updater uses the executable's own
-// directory, so the later swap is a rename on the same filesystem.
-func (u *Updater) download(ctx context.Context, a Asset, dir, prefix string) (string, error) {
+// directory, so the later swap is a rename on the same filesystem. w, when
+// set, hears the progress and gives up on a download that stops arriving.
+func (u *Updater) download(ctx context.Context, a Asset, dir, prefix string, w *watch) (string, error) {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 	src, err := u.assetURL(a)
 	if err != nil {
 		return "", fmt.Errorf("download: %w", err)
@@ -349,21 +356,28 @@ func (u *Updater) download(ctx context.Context, a Asset, dir, prefix string) (st
 	}
 	tmp := f.Name()
 	h := sha256.New()
-	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(body, a.Size+1))
+	var r io.Reader = io.LimitReader(body, a.Size+1)
+	if w != nil {
+		r = w.reader(ctx, r, a.Size, cancel)
+	}
+	n, err := io.Copy(io.MultiWriter(f, h), r)
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
 	if err != nil {
 		os.Remove(tmp)
+		if why := context.Cause(ctx); why != nil {
+			err = why
+		}
 		return "", fmt.Errorf("download: %w", err)
 	}
 	if n != a.Size {
 		os.Remove(tmp)
-		return "", fmt.Errorf("download: got %d bytes, manifest says %d", n, a.Size)
+		return "", fmt.Errorf("download: %w: got %d bytes, manifest says %d", ErrDamaged, n, a.Size)
 	}
 	if sum := hex.EncodeToString(h.Sum(nil)); sum != a.SHA256 {
 		os.Remove(tmp)
-		return "", fmt.Errorf("download: sha256 %s does not match manifest %s", sum, a.SHA256)
+		return "", fmt.Errorf("download: %w: sha256 %s, manifest %s", ErrDamaged, sum, a.SHA256)
 	}
 	if err := os.Chmod(tmp, 0o755); err != nil {
 		os.Remove(tmp)

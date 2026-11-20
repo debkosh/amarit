@@ -2,12 +2,17 @@ package amarit
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func testClient(t *testing.T, manifest func(string) string, asset []byte, running string) *Client {
@@ -142,4 +147,143 @@ func TestClientSettingsAreShared(t *testing.T) {
 	if left, _ := filepath.Glob(filepath.Join(state, "settings-*")); len(left) != 0 {
 		t.Fatalf("temporary files left: %v", left)
 	}
+}
+
+func TestClientDownloadReportsProgressAndNamesADamagedOne(t *testing.T) {
+	c := testClient(t, manifestFor("0.6.0", "0.5.0", ""), assetBody, "0.5.0")
+	d, _ := c.Check(context.Background())
+	var done, total int64
+	if _, err := c.Download(context.Background(), d, t.TempDir(), OnProgress(func(n, of int64) { done, total = n, of })); err != nil {
+		t.Fatal(err)
+	}
+	if done != assetSize || total != assetSize {
+		t.Fatalf("progress ended at %d of %d, want %d", done, total, assetSize)
+	}
+	d.Asset.SHA256 = strings.Repeat("0", 64)
+	if _, err := c.Download(context.Background(), d, t.TempDir()); !errors.Is(err, ErrDamaged) {
+		t.Fatalf("a wrong sum: %v, want ErrDamaged", err)
+	}
+}
+
+// A download that stops arriving is given up with ErrStalled; one its
+// caller cancels with a cause returns that cause.
+func TestClientDownloadStallAndCancel(t *testing.T) {
+	hang := make(chan struct{})
+	t.Cleanup(func() { close(hang) })
+	mux := http.NewServeMux()
+	var srv *httptest.Server
+	mux.HandleFunc("/releases.json", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, manifestFor("0.6.0", "0.5.0", "")(srv.URL+"/asset"))
+	})
+	mux.HandleFunc("/asset", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprint(assetSize))
+		w.Write(assetBody[:4])
+		w.(http.Flusher).Flush()
+		select {
+		case <-hang:
+		case <-r.Context().Done():
+		}
+	})
+	srv = httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	c, err := NewClient(t.TempDir(), "stable", Project("demo"), Version("0.5.0"), Releases(srv.URL+"/releases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := c.Check(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if _, err := c.Download(context.Background(), d, dir, StallAfter(200*time.Millisecond)); !errors.Is(err, ErrStalled) {
+		t.Fatalf("a stalled download: %v, want ErrStalled", err)
+	}
+	errMine := errors.New("the person cancelled")
+	ctx, cancel := context.WithCancelCause(context.Background())
+	time.AfterFunc(100*time.Millisecond, func() { cancel(errMine) })
+	if _, err := c.Download(ctx, d, dir); !errors.Is(err, errMine) {
+		t.Fatalf("a cancelled download: %v, want the cause", err)
+	}
+	if left, _ := os.ReadDir(dir); len(left) != 0 {
+		t.Fatalf("files left: %v", left)
+	}
+}
+
+func TestClientLockIsOneCopyAtATime(t *testing.T) {
+	dir := t.TempDir()
+	a, _ := NewClient(dir, "", Project("demo"), Version("1.0.0"), Releases("http://x/releases.json"))
+	b, _ := NewClient(dir, "", Project("demo"), Version("1.0.0"), Releases("http://x/releases.json"))
+	unlock, ok, err := a.TryLock()
+	if err != nil || !ok {
+		t.Fatalf("first lock: %v %v", ok, err)
+	}
+	if _, ok, _ := b.TryLock(); ok {
+		t.Fatal("a second copy took a held lock")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	if _, err := b.Lock(ctx); err == nil {
+		t.Fatal("Lock returned while another copy held it")
+	}
+	unlock()
+	unlock2, err := b.Lock(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock2()
+}
+
+// A release that never comes up healthy is rolled back after three failed
+// starts, and copies starting at once are not failures.
+func TestClientRollbackCountsStartsThatEnded(t *testing.T) {
+	dir := t.TempDir()
+	old, _ := NewClient(dir, "", Project("demo"), Version("1.0.0"), Releases("http://x/releases.json"))
+	if err := old.Installing("1.1.0"); err != nil {
+		t.Fatal(err)
+	}
+	next, _ := NewClient(dir, "", Project("demo"), Version("1.1.0"), Releases("http://x/releases.json"))
+	// Copies starting together: this process, several times, while alive.
+	for range 5 {
+		if back, err := next.Started(); err != nil || back {
+			t.Fatalf("live copies asked for a rollback: %v %v", back, err)
+		}
+	}
+	// Three starts whose processes ended without Healthy.
+	st := next.u.loadState()
+	st.Pending = []int{deadPID(t), deadPID(t), deadPID(t)}
+	next.u.saveState(st)
+	back, err := next.Started()
+	if err != nil || !back {
+		t.Fatalf("three failed starts: rollback %v %v", back, err)
+	}
+	if err := next.RolledBack(); err != nil {
+		t.Fatal(err)
+	}
+	if got := old.u.loadState(); got.Rejected != "1.1.0" || got.Healthy != "1.0.0" || got.Attempt != "" {
+		t.Fatalf("state after the rollback: %+v", got)
+	}
+	if back, _ := old.Started(); back {
+		t.Fatal("the version rolled back to asked for a rollback")
+	}
+
+	// Healthy ends the counting.
+	old.Installing("1.2.0")
+	healthy, _ := NewClient(dir, "", Project("demo"), Version("1.2.0"), Releases("http://x/releases.json"))
+	healthy.Started()
+	if err := healthy.Healthy(); err != nil {
+		t.Fatal(err)
+	}
+	if got := healthy.u.loadState(); got.Attempt != "" || got.Healthy != "1.2.0" {
+		t.Fatalf("state after Healthy: %+v", got)
+	}
+}
+
+// deadPID is the pid of a process that has ended.
+func deadPID(t *testing.T) int {
+	t.Helper()
+	cmd := exec.Command("/bin/sh", "-c", "exit 0")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+	return cmd.Process.Pid
 }
