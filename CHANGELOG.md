@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.9.0
+
+What Project B built around the Client for its Mac app, in amarit, so the
+next app does not write it again. Guide: docs/appupdate.md.
+
+- **`amarit/appupdate`**: the updater of an app a person uses. It draws
+  nothing: a JSON-ready `State` and its changes go out, `Check`, `Retry`,
+  `Cancel`, `Relaunch`, `SetChannel` and `SetAutoUpdate` come in, and the
+  guide's table says which commands each phase takes. Failures carry a kind
+  (offline, network, stalled, damaged, unchecked, refused, not-writable,
+  busy, install), not words. Rounds on a timer, the lock and the staged
+  release shared by every copy, a cancelled release left alone until asked,
+  a refused one rejected.
+- **`amarit/macapp`**: a macOS bundle. `Info`, `Unpack` (ditto, keeping
+  the open-file limit for the child), `Verify` with the Security framework
+  in process, telling a real refusal from a check that couldn't be made,
+  `Stage`/`Staged`, `Swap` and `Rollback` with one `renamex_np(RENAME_SWAP)`.
+  `macapp.Installer` puts them together, with `Copies` for an app running
+  several copies and `Settle` for the rollback at start. Needs cgo.
+- **`amarit/relaunch`**: `After` starts a program once this process has
+  gone; `WaitExited` waits for other processes to end.
+- **Client**: `Download` takes `OnProgress` and `StallAfter`; errors
+  `ErrDamaged`, `ErrStalled`, `ErrRefused`, `ErrNotWritable`; `TryLock` and
+  `Lock` on the state directory; `Installing`, `Started`, `Healthy` and
+  `RolledBack`, the rollback count for a program that installs itself. A
+  start fails when its process ends before Healthy, so copies starting
+  together are not failures.
+
 ## v0.8.2
 
 - **`amarit job [-name N] [-dir D] [-env-file F] [-log F] -- <cmd>`**: a

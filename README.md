@@ -199,6 +199,11 @@ What the developer quick start sets up, in more depth:
   on, point `releases` at a local directory.
 - **Android too.** A Kotlin library reads the same manifest and hands the
   APK to the package installer.
+- **Apps a person uses.** `amarit/appupdate` is the updater behind an
+  app's update button: state and progress out, Check, Cancel, Retry and
+  Relaunch in, no interface of its own. `amarit/macapp` installs a macOS
+  bundle: signature checked in process, swapped in atomically, rolled back
+  if it won't start. See [docs/appupdate.md](docs/appupdate.md).
 
 The full guide is [docs/updates.md](docs/updates.md), the manifest format
 is [docs/spec.md](docs/spec.md), and the reasoning behind the design is

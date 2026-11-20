@@ -174,6 +174,10 @@ stable stays on that build until a stable release passes it.
 The manifest, the asset pattern and `amarit release` are the same as for a
 binary, with the bundle's archive as the asset.
 
+For an app a person uses, `amarit/appupdate` is the whole updater around
+the Client, with no interface of its own, and `amarit/macapp` installs a
+macOS bundle: [appupdate.md](appupdate.md).
+
 ## Keep an Android app current
 
 The same manifest, consumed from Kotlin: the library in [`android/`](android/)
