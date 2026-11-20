@@ -90,11 +90,16 @@ The running version is what the package manager reports: `versionName` is
 the version string, `versionCode` the integer. An asset's `version_code`
 above the installed code is an update; below it never is, whatever the
 strings say; equal codes with a different version string are an update
-too, since Android installs a rebuild of the same code in place. That last
-rule is how a rolling channel works without touching `versionCode`: the
-build names each push `0.2.1+g6c3c4d4` (semver build metadata, which
-section 3 ignores for order), the manifest's channel points at that string,
-and a phone on the channel sees a new string on the same code.
+too, since Android installs a rebuild of the same code in place, unless
+semver orders the asset's version before the installed one. That last
+rule is how a rolling channel works without touching `versionCode`. Its
+builds are named `0.3.9-dev.202611201415`, the next patch with the channel
+and the UTC minute, and carry the code of 0.3.9 (`major*1000000 +
+minor*1000 + patch`, the pre-release part dropped): a phone on the channel
+takes each newer build and then the release 0.3.9 on the same code, and a
+phone on 0.3.9 that picks the channel is not taken back to a build before
+it. Builds named with semver build metadata, `0.2.1+g6c3c4d4`, which this
+section ignores for order, are taken whenever the string differs.
 `min_version` compares against `versionName` in semver order. A client
 never installs silently: the platform asks the user, and the platform
 refuses an APK signed by a different key than the installed one, which is

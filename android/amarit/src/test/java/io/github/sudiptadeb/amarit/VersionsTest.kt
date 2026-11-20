@@ -18,6 +18,9 @@ class VersionsTest {
             Triple("1.0.0-1", "1.0.0-alpha", -1),
             Triple("1.0.0+build.7", "1.0.0", 0),
             Triple("0.2.1+g6c3c4d4", "0.2.1", 0),
+            Triple("0.3.9-dev.202611201414", "0.3.9-dev.202611201415", -1),
+            Triple("0.3.9-dev.999999999999", "0.3.9-dev.1000000000000", -1),
+            Triple("0.3.9-dev.202611201415", "0.3.9", -1),
         )
         for ((a, b, want) in cases) assertEquals("$a vs $b", want, Versions.compare(a, b))
         for (bad in listOf("v1.0.0", "1.0", "1.01.0", "2026-10-09--11-17+sha", "", "1.a.0")) {

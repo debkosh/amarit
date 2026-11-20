@@ -47,6 +47,19 @@ class DecideTest {
     }
 
     @Test
+    fun rollingBuildsShareTheReleaseCode() {
+        // Dev builds of 0.3.9 and the release 0.3.9 all carry 3009.
+        val m = manifest(latest = "0.3.9-dev.202611201415", latestCode = 3009, stable = "0.3.9", stableCode = 3009)
+        assertTrue(decide(m, "latest", Installed("0.3.9-dev.202611200900", 3009), id, null, fresh).update)
+        assertTrue(decide(m, "stable", Installed("0.3.9-dev.202611201415", 3009), id, null, fresh).update)
+        // A copy on the release that picks the rolling channel is not taken back to a build before it.
+        val d = decide(m, "latest", Installed("0.3.9", 3009), id, null, fresh)
+        assertFalse(d.update)
+        assertTrue(d.reason, d.reason.contains("not downgrading"))
+        assertFalse(decide(m, "latest", Installed("0.3.9-dev.202611201500", 3009), id, null, fresh).update)
+    }
+
+    @Test
     fun lowerCodeIsNeverTaken() {
         val d = decide(manifest(stable = "0.2.1", stableCode = 3), "stable", Installed("0.3.0+g1111111", 4), id, null, fresh)
         assertFalse(d.update)

@@ -53,13 +53,17 @@ object Versions {
         val xs = a.split(".")
         val ys = b.split(".")
         for (i in 0 until minOf(xs.size, ys.size)) {
-            val xn = xs[i].toIntOrNull()
-            val yn = ys[i].toIntOrNull()
+            val x = xs[i]
+            val y = ys[i]
+            // Digits of any length: a rolling build's UTC minute, 202611201415, is past Int.
+            val xn = x.isNotEmpty() && x.all { it in '0'..'9' }
+            val yn = y.isNotEmpty() && y.all { it in '0'..'9' }
             when {
-                xn != null && yn != null -> if (xn != yn) return if (xn < yn) -1 else 1
-                xn != null -> return -1 // numeric identifiers sort before alphanumeric ones
-                yn != null -> return 1
-                else -> xs[i].compareTo(ys[i]).let { if (it != 0) return if (it < 0) -1 else 1 }
+                xn && yn -> if (x.length != y.length) return if (x.length < y.length) -1 else 1
+                    else x.compareTo(y).let { if (it != 0) return if (it < 0) -1 else 1 }
+                xn -> return -1 // numeric identifiers sort before alphanumeric ones
+                yn -> return 1
+                else -> x.compareTo(y).let { if (it != 0) return if (it < 0) -1 else 1 }
             }
         }
         return xs.size.compareTo(ys.size).coerceIn(-1, 1)
@@ -88,10 +92,13 @@ class Decision(
  * Decides whether an install takes what a channel points at. On Android the
  * platform compares versionCode, so: a higher code is an update, a lower
  * code never is, and an equal code with a different version string is an
- * update too, since Android installs a rebuild of the same code in place.
- * That last row is what carries a rolling channel whose builds are named
- * `0.2.1+g6c3c4d4` on one versionCode. min_version compares against
- * versionName in semver order. The clauses follow engine.go's Check.
+ * update too, since Android installs a rebuild of the same code in place,
+ * unless semver puts the new name before the running one. That row carries
+ * a rolling channel on one versionCode, whether its builds are named
+ * `0.3.9-dev.202611201415` (each newer, and the release 0.3.9 after them)
+ * or `0.2.1+g6c3c4d4` (build metadata, which semver does not order).
+ * min_version compares against versionName in semver order. The clauses
+ * follow engine.go's Check.
  */
 fun decide(
     m: Manifest,
@@ -120,6 +127,9 @@ fun decide(
         codeCmp > 0 ->
             Decision(m, t.version, t.release, t.asset, false,
                 "running $running (${installed.versionCode}) is newer than ${t.version} (${t.asset.versionCode}); not downgrading", belowFloor)
+        codeCmp == 0 && sortsBefore(t.version, running) ->
+            Decision(m, t.version, t.release, t.asset, false,
+                "running $running is newer than ${t.version} on the same code ${installed.versionCode}; not downgrading", belowFloor)
         t.version == skipped && !belowFloor && !t.release.critical ->
             Decision(m, t.version, t.release, t.asset, false, "${t.version} was skipped on this install; waiting for a newer release", belowFloor)
         m.isStale(now) && !belowFloor ->
@@ -133,4 +143,11 @@ fun decide(
             Decision(m, t.version, t.release, t.asset, true, reason, belowFloor)
         }
     }
+}
+
+/** Semver puts [a] before [b]; a name that does not parse never sorts before. */
+private fun sortsBefore(a: String, b: String): Boolean = try {
+    Versions.compare(a, b) < 0
+} catch (e: IllegalArgumentException) {
+    false
 }
