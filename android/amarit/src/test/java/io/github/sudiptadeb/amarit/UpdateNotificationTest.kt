@@ -11,7 +11,7 @@ class UpdateNotificationTest {
     @Test
     fun downloadingShowsProgressWithCancel() {
         val s = shown("""{"phase":"downloading","version":"0.3.9","done":50,"total":200}""")!!
-        assertEquals(R.string.amarit_downloading_app, s.title)
+        assertEquals(R.string.amarit_notification_downloading, s.title)
         assertEquals(50L, s.done)
         assertEquals(200L, s.total)
         assertEquals(true, s.ongoing)
@@ -29,7 +29,7 @@ class UpdateNotificationTest {
     fun readyOffersInstall() {
         val s = shown("""{"phase":"ready","version":"0.3.9"}""")!!
         assertEquals("relaunch", s.command)
-        assertEquals(R.string.amarit_install, s.commandLabel)
+        assertEquals(R.string.amarit_notification_install, s.commandLabel)
         assertEquals(false, s.ongoing)
     }
 

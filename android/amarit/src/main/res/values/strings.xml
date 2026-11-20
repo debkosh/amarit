@@ -16,11 +16,4 @@
     <string name="amarit_failed">Update failed</string>
     <string name="amarit_incompatible">The update is signed with a different key than the installed app. Uninstall the app and install it again.</string>
     <string name="amarit_up_to_date">%1$s %2$s is up to date</string>
-    <string name="amarit_downloading_app">Downloading %1$s %2$s</string>
-    <string name="amarit_verifying">Checking %1$s %2$s</string>
-    <string name="amarit_ready">%1$s %2$s is ready</string>
-    <string name="amarit_ready_text">Install it when you\'re ready</string>
-    <string name="amarit_failed_text">%1$s %2$s didn\'t download. Try again.</string>
-    <string name="amarit_cancel">Cancel</string>
-    <string name="amarit_retry">Try again</string>
 </resources>

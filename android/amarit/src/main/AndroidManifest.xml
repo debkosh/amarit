@@ -20,7 +20,7 @@
             android:exported="false" />
 
         <receiver
-            android:name=".UpdateCommandReceiver"
+            android:name=".UpdateNotification$Receiver"
             android:exported="false" />
 
         <service
