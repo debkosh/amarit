@@ -4,6 +4,7 @@
 //	amarit stamp   [-config amarit.json] -version 0.5.3
 //	amarit release [-config amarit.json] -version 0.5.3 -dist dist [-channel stable] [-out releases.json]
 //	amarit release -version 0.2.1+g6c3c4d4 -version-code 3 -channel latest -asset app-latest.apk -url https://.../app-latest.apk -prune
+//	amarit publish -github owner/repo -tag channels -version 0.3.9-dev.202611201415 -channel dev -prune [file ...]
 //	amarit next-version [-pre dev] 0.3.8
 //	amarit version-code 0.3.9-dev.202611201415
 //	amarit update  [-check] [-rolling] [unit|glob ...]
@@ -39,6 +40,8 @@ func main() {
 		err = stamp(os.Args[2:])
 	case "release":
 		err = release(os.Args[2:])
+	case "publish":
+		err = publish(os.Args[2:])
 	case "next-version":
 		err = nextVersion(os.Args[2:])
 	case "version-code":
@@ -131,6 +134,12 @@ keep it current (release side):
                  [-asset PATTERN] [-url PATTERN] [-prune]        this run's patterns over release.asset and release.url;
                                                                  -prune drops the release the channel pointed at until
                                                                  now, unless another channel still points at it
+  amarit publish -github OWNER/REPO -tag T [release flags] [file ...]
+                                                                 release onto GitHub release T (made a pre-release if
+                                                                 missing): merge into its releases.json (else the latest
+                                                                 release's), upload the version's assets that live on T,
+                                                                 the files named, then the manifest; -prune also deletes
+                                                                 the dropped release's files from T
   amarit next-version [-pre dev] X                               the name of a rolling build after release X:
                                                                  0.3.9-dev.<UTC minute> after 0.3.8, which semver orders
   amarit version-code X                                          the APK versionCode of X, its pre-release part dropped:
@@ -188,46 +197,79 @@ func stamp(args []string) error {
 // APK's versionCode, which CI knows and passes with -version-code.
 func release(args []string) error {
 	fs := flag.NewFlagSet("release", flag.ContinueOnError)
-	config := fs.String("config", "amarit.json", "project configuration")
-	version := fs.String("version", "", "version being released")
-	dist := fs.String("dist", "dist", "directory holding the built assets")
-	channel := fs.String("channel", "stable", "channel to point at this version")
-	out := fs.String("out", "releases.json", "manifest to write")
-	expires := fs.Duration("expires", 0, "how long the manifest stays fresh (0 = no expiry)")
-	versionCode := fs.Int("version-code", 0, "the APK versionCode (android target)")
-	assetPattern := fs.String("asset", "", "asset name pattern for this run, over release.asset")
-	urlFlag := fs.String("url", "", "download URL pattern for this run, over release.url")
-	prune := fs.Bool("prune", false, "drop the release this channel pointed at until now, unless another channel still does")
+	r := releaseFlags(fs, "releases.json")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *version == "" {
-		return fmt.Errorf("-version is required")
+	_, err := r.write("")
+	return err
+}
+
+// releaseRun is the flags of `amarit release`, which `amarit publish` takes too.
+type releaseRun struct {
+	config, version, dist, channel, out, assetPattern, urlFlag *string
+	expires                                                    *time.Duration
+	versionCode                                                *int
+	prune                                                      *bool
+}
+
+func releaseFlags(fs *flag.FlagSet, out string) *releaseRun {
+	return &releaseRun{
+		config:       fs.String("config", "amarit.json", "project configuration"),
+		version:      fs.String("version", "", "version being released"),
+		dist:         fs.String("dist", "dist", "directory holding the built assets"),
+		channel:      fs.String("channel", "stable", "channel to point at this version"),
+		out:          fs.String("out", out, "manifest to write"),
+		expires:      fs.Duration("expires", 0, "how long the manifest stays fresh (0 = no expiry)"),
+		versionCode:  fs.Int("version-code", 0, "the APK versionCode (android target)"),
+		assetPattern: fs.String("asset", "", "asset name pattern for this run, over release.asset"),
+		urlFlag:      fs.String("url", "", "download URL pattern for this run, over release.url"),
+		prune:        fs.Bool("prune", false, "drop the release this channel pointed at until now, unless another channel still does"),
 	}
-	c, _, err := loadConfig(*config)
+}
+
+// released is what a run wrote: the manifest, the version, each target's
+// file, and the release -prune dropped ("" when none).
+type released struct {
+	manifest amarit.Manifest
+	version  string
+	files    map[string]string
+	pruned   string
+}
+
+// write merges the run into the manifest at -out and writes it back.
+// defaultURL is the url pattern when neither -url nor release.url gives one.
+func (r *releaseRun) write(defaultURL string) (*released, error) {
+	if *r.version == "" {
+		return nil, fmt.Errorf("-version is required")
+	}
+	c, _, err := loadConfig(*r.config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if c.Release == nil || len(c.Release.Targets) == 0 {
-		return fmt.Errorf("%s: release.targets is empty", *config)
+		return nil, fmt.Errorf("%s: release.targets is empty", *r.config)
 	}
-	if *assetPattern == "" {
-		*assetPattern = c.Release.Asset
+	if *r.assetPattern == "" {
+		*r.assetPattern = c.Release.Asset
 	}
-	if *assetPattern == "" {
-		return fmt.Errorf("%s: release.asset pattern is required", *config)
+	if *r.assetPattern == "" {
+		return nil, fmt.Errorf("%s: release.asset pattern is required", *r.config)
 	}
 	urlPattern := c.Release.URL
-	if *urlFlag != "" {
-		urlPattern = *urlFlag
+	if *r.urlFlag != "" {
+		urlPattern = *r.urlFlag
+	}
+	if urlPattern == "" {
+		urlPattern = defaultURL
 	}
 	if urlPattern == "" {
 		urlPattern = "{asset}"
 	}
-	v := strings.TrimPrefix(*version, "v")
+	v := strings.TrimPrefix(*r.version, "v")
 	for _, target := range c.Release.Targets {
-		if target == "android" && *versionCode <= 0 {
-			return fmt.Errorf("the android target needs -version-code")
+		if target == "android" && *r.versionCode <= 0 {
+			return nil, fmt.Errorf("the android target needs -version-code")
 		}
 	}
 
@@ -238,13 +280,13 @@ func release(args []string) error {
 		Channels:  map[string]string{},
 		Releases:  map[string]amarit.Release{},
 	}
-	if *expires > 0 {
-		e := m.Published.Add(*expires)
+	if *r.expires > 0 {
+		e := m.Published.Add(*r.expires)
 		m.Expires = &e
 	}
 	// Keep what an existing manifest already says about other channels and
 	// versions, so promoting canary never forgets stable.
-	if old, err := os.ReadFile(*out); err == nil {
+	if old, err := os.ReadFile(*r.out); err == nil {
 		if om, err := amarit.ParseManifest(old); err == nil && om.Project == c.Project {
 			m.Channels, m.Releases, m.MinVersion = om.Channels, om.Releases, om.MinVersion
 		}
@@ -254,48 +296,52 @@ func release(args []string) error {
 	}
 
 	assets := map[string]amarit.Asset{}
+	files := map[string]string{}
 	for _, target := range c.Release.Targets {
 		goos, goarch, _ := strings.Cut(target, "/")
 		fill := strings.NewReplacer("{version}", v, "{os}", goos, "{arch}", goarch)
-		name := fill.Replace(*assetPattern)
-		path := findAsset(*dist, name)
+		name := fill.Replace(*r.assetPattern)
+		path := findAsset(*r.dist, name)
 		if path == "" {
-			return fmt.Errorf("%s: no file named %s under %s", target, name, *dist)
+			return nil, fmt.Errorf("%s: no file named %s under %s", target, name, *r.dist)
 		}
 		sum, size, err := digest(path)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		url := strings.NewReplacer("{version}", v, "{os}", goos, "{arch}", goarch, "{asset}", name).Replace(urlPattern)
 		a := amarit.Asset{URL: url, SHA256: sum, Size: size}
 		if target == "android" {
-			a.VersionCode = *versionCode
+			a.VersionCode = *r.versionCode
 		}
 		assets[target] = a
+		files[target] = path
 		fmt.Fprintf(os.Stderr, "  %-14s %s  %d bytes  %s\n", target, name, size, sum[:12])
 	}
 	m.Releases[v] = amarit.Release{Assets: assets}
-	previous := m.Channels[*channel]
-	m.Channels[*channel] = v
-	if *prune && previous != "" && previous != v && !slices.Contains(slices.Collect(maps.Values(m.Channels)), previous) {
+	previous := m.Channels[*r.channel]
+	m.Channels[*r.channel] = v
+	pruned := ""
+	if *r.prune && previous != "" && previous != v && !slices.Contains(slices.Collect(maps.Values(m.Channels)), previous) {
 		// Only the build this channel leaves: another channel's old
 		// releases are that channel's business.
 		delete(m.Releases, previous)
+		pruned = previous
 		fmt.Fprintf(os.Stderr, "  pruned %s\n", previous)
 	}
 
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if _, err := amarit.ParseManifest(data); err != nil {
-		return fmt.Errorf("refusing to write an invalid manifest: %w", err)
+		return nil, fmt.Errorf("refusing to write an invalid manifest: %w", err)
 	}
-	if err := os.WriteFile(*out, append(data, '\n'), 0o644); err != nil {
-		return err
+	if err := os.WriteFile(*r.out, append(data, '\n'), 0o644); err != nil {
+		return nil, err
 	}
-	fmt.Fprintf(os.Stderr, "wrote %s: %s %s -> %s\n", *out, c.Project, *channel, v)
-	return nil
+	fmt.Fprintf(os.Stderr, "wrote %s: %s %s -> %s\n", *r.out, c.Project, *r.channel, v)
+	return &released{manifest: m, version: v, files: files, pruned: pruned}, nil
 }
 
 // findAsset looks for the file directly under dist or one level down

@@ -250,6 +250,42 @@ code with a newer name as an update, so it follows the dev builds and then
 the release (spec, section 3). A Gradle build that computes the code
 itself uses the same formula.
 
+On GitHub the manifest of every channel lives on one release with a fixed
+tag, `https://github.com/o/r/releases/download/channels/releases.json` in
+`amarit.json`'s `releases`; `releases/latest/download/` will not do, since
+it skips pre-releases and moves with each stable release. `amarit publish`
+is `amarit release` against that release, through the `gh` CLI and its
+login:
+
+```sh
+amarit publish -github o/r -tag channels -version "$V" -version-code "$CODE" \
+    -channel dev -url '{asset}' -dist dist -prune dist/App-$V.dmg dist/App-$V.apk
+```
+
+It creates the `channels` pre-release if it is missing, downloads its
+`releases.json` (the first time, the latest release's, which is where
+copies from before channels read), merges the version in, uploads the
+version's assets that live on the tag (here every target, `-url '{asset}'`
+naming them beside the manifest) and the files named after the flags, then
+the manifest, all with `--clobber`. `-prune` drops the dev build this one
+replaces from the manifest and deletes its files from the tag: the files
+whose names carry its version, unless the longest version a name carries
+is one the manifest still has. A manifest there that does not parse stops
+the publish before anything is uploaded. Run one publish at a time (a CI
+concurrency group): two at once each merge into the manifest they fetched,
+and the later upload loses the other's version.
+
+A stable release keeps its own numbered release with its notes, and
+publishes into the same manifest. With `release.url` in `amarit.json`
+naming the numbered release (`.../download/v{version}/{asset}`), the assets
+are not on `channels`, so only the manifest goes there. The numbered
+release comes first, so the manifest never names a file not there yet:
+
+```sh
+gh release create "v$VERSION" dist/App-* --title "$VERSION" --notes-file notes.md
+amarit publish -github o/r -tag channels -version "$VERSION" -version-code "$CODE" -dist dist
+```
+
 ## How an update runs
 
 ```

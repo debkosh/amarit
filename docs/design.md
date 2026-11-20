@@ -370,6 +370,13 @@ Decisions, and what was not taken:
   it. It used to forget every release no channel pointed at, which took a
   stable channel's history with every rolling build; now each channel
   prunes only what it published.
+- *publish drives gh.* `amarit publish` runs the GitHub CLI rather than
+  calling GitHub's API, so the library and the tool keep to the standard
+  library, and the login is whatever gh already has: the keychain on a
+  laptop, `GH_TOKEN` in Actions. It fails closed on the manifest it
+  fetches (a file there that does not parse stops it) and uploads the
+  manifest after the assets, so a client never reads a manifest that names
+  a file not there yet.
 - *Consent.* The same layers as the Go side, in Android's terms:
   `assets/amarit.json` is the stamp (the build copies the repository file
   in; the library reads nothing it was not given), options in code lay
