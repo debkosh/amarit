@@ -544,6 +544,9 @@ raise `UpdateAvailable`, which nothing has tested yet.
   releases that too only when asked"): one Flatpak branch, stable.
   `SetChannel` on this source returns an unsupported error, and the shell
   shows no channel switch there.
+- **Flatpak owns versions and delivery**; release notes are the Mac's
+  (Sudipta, 2026-11-20). Project B builds its notes into the app, so a Linux
+  build shows the same ones and amarit reads no manifest there.
 - **Rollback** is Flatpak's (`flatpak update --commit`), not amarit's.
 - **The presenter** is the Notification portal, not
   `org.freedesktop.Notifications`, since the app is sandboxed: a
