@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.10.0
+
+The system's own way of showing an app's updater. Guide: docs/appupdate.md.
+
+- **`macapp.Present(u, words)`**: a progress bar on the app's Dock icon
+  while appupdate downloads and checks, and a notification with Relaunch
+  when a release is ready. amarit installs a notification delegate only
+  when the app has none; an app with one forwards amarit's category to
+  `macapp.HandleNotificationResponse`. The app's own categories are kept.
+- **Android `UpdateNotification`**: shows appupdate's State, as JSON, as
+  the system's notification, with Cancel, Install and Try again sent back
+  as commands. Its words are resources an app overrides.
+- **`examples/macupdate`**: an app that updates itself from a release it
+  serves slowly, to watch both on a Mac.
+
 ## v0.9.0
 
 What Project B built around the Client for its Mac app, in amarit, so the

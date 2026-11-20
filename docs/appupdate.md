@@ -152,6 +152,60 @@ under launchd.
 macapp needs cgo, for the Security framework and `renamex_np`. These are
 the system's own frameworks, not a dependency.
 
+## The system's own way of showing it
+
+An app may show the updater the way its platform does, beside or instead of
+its own view. These presenters listen to the same State and send the same
+commands as any view.
+
+**Mac**: `macapp.Present(u, macapp.Words{})` puts a progress bar on the app's
+Dock icon while it downloads and checks, and when a release is ready posts a
+notification with a Relaunch button. `Words` overrides the English: `Ready`
+(a format of the app's name and the version), `Body`, `Relaunch`. The app
+needs an NSApplication and a bundle identifier, and asks for notifications
+the first time.
+
+amarit never replaces an app's notification delegate. When the app has none,
+amarit installs its own. An app with one forwards the responses in amarit's
+category:
+
+```objc
+// in the app's didReceiveNotificationResponse:
+if ([response.notification.request.content.categoryIdentifier isEqualToString:@"amarit.update"]) {
+  GoHandleAmaritResponse(response.actionIdentifier.UTF8String); // calls macapp.HandleNotificationResponse
+  completionHandler();
+  return;
+}
+```
+
+amarit keeps the app's own notification categories beside its own.
+
+**Android**: the library's `UpdateNotification` shows the state the Go
+updater makes, as its JSON, as the system's notification: progress with
+Cancel while downloading, Install when ready, Try again after a failure a
+retry can help.
+
+```kotlin
+UpdateNotification.commands = UpdateNotification.Commands { name -> goUpdater.command(name) } // "cancel", "retry", "relaunch"
+// on every change of the Go updater's state:
+UpdateNotification.show(context, stateJson)
+```
+
+Its words are string resources (`amarit_downloading_app`, `amarit_ready`,
+`amarit_failed_text`, ...), which the app overrides with its own. The app
+asks for `POST_NOTIFICATIONS` on Android 13 and later. A tap while the app's
+process is gone opens the app.
+
+`examples/macupdate` is an app that updates itself from a release it serves
+slowly, to see both on a Mac: `./build.sh`, then open `amarit demo.app`.
+
+## Automatic updates are the project's to declare
+
+`AutoUpdate` is off unless the project's amarit.json says
+`"auto_update": true` (pass it with `amarit.ProjectFile(raw)` or the stamp),
+and a person's `SetAutoUpdate` wins over both. With it off, rounds still
+offer a release another copy staged, and a person's Check still checks.
+
 ## The Client underneath
 
 For a program that wants the pieces without appupdate:
