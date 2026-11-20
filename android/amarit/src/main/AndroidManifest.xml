@@ -19,6 +19,10 @@
             android:name=".InstallReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".UpdateCommandReceiver"
+            android:exported="false" />
+
         <service
             android:name=".CheckJob"
             android:exported="false"
