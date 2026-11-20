@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.10.2
+
+- **`relaunch.WaitExited` on Linux waits on pidfds** (`pidfd_open` and
+  `ppoll`, Linux 5.3 and later), told by the kernel instead of asking every
+  50 ms, and without mistaking an unreaped child for a running one. An older
+  kernel is polled as before. Asked for by Project B's Linux build.
+
 ## v0.10.1
 
 - **`amarit wait N`** blocks until the running job N ends and exits with
