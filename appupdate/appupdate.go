@@ -112,10 +112,17 @@ type Config struct {
 var (
 	errCancelled = errors.New("cancelled")
 	errRetried   = errors.New("retried")
+	errClosed    = errors.New("closed")
 )
 
 // Updater keeps an app current. Its methods may be called from any
 // goroutine.
+//
+// Work runs on its own goroutines under a context: the one the person last
+// started with Check, Retry or SetChannel, which an automatic round shares.
+// Cancel, Retry, SetChannel and Close end that context, and from then on
+// nothing that work does reaches the state or starts a download, so a
+// quick Retry then Cancel leaves nothing running.
 type Updater struct {
 	cfg Config
 
@@ -123,19 +130,16 @@ type Updater struct {
 	state         State
 	staged        string // the release Relaunch installs, and its version
 	stagedVersion string
-	fetching      *attempt // the download running now
-	declined      string   // a release the person cancelled: automatic checks leave it alone
-	busy          bool     // an Install is running
+	declined      string // a release the person cancelled: automatic checks leave it alone
+	busy          bool   // an Install is running
+	work          context.Context
+	abort         context.CancelCauseFunc
+	closed        bool
+	running       sync.WaitGroup // every goroutine doing work, for Close
 
-	timer   chan struct{} // closed to end the round loop; nil when stopped
-	wake    chan struct{}
-	events  *queue
-	started bool
-}
-
-type attempt struct {
-	version string
-	stop    context.CancelCauseFunc
+	timer  chan struct{} // closed to end the round loop; nil when stopped
+	wake   chan struct{}
+	events *queue
 }
 
 // New returns an updater; Start begins its rounds.
@@ -181,14 +185,14 @@ func (u *Updater) Start() {
 	}
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if u.timer != nil {
+	if u.timer != nil || u.closed {
 		return
 	}
 	u.timer = make(chan struct{})
 	go u.loop(u.timer)
 }
 
-// Stop ends the rounds. A download running goes on.
+// Stop ends the rounds. Work already running goes on; Close ends it.
 func (u *Updater) Stop() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -196,6 +200,20 @@ func (u *Updater) Stop() {
 		close(u.timer)
 		u.timer = nil
 	}
+}
+
+// Close ends the rounds and the work running, a download among them, and
+// returns once all of it has stopped and its files are gone. The updater
+// takes no command after it. An app calls it as it quits.
+func (u *Updater) Close() {
+	u.Stop()
+	u.mu.Lock()
+	u.closed = true
+	if u.abort != nil {
+		u.abort(errClosed)
+	}
+	u.mu.Unlock()
+	u.running.Wait()
 }
 
 func (u *Updater) loop(stop chan struct{}) {
@@ -212,11 +230,48 @@ func (u *Updater) loop(stop chan struct{}) {
 	}
 }
 
+// newWork ends the work running, with why, and starts the context of new
+// work. ok is false once the updater is closed. The caller calls
+// u.running.Done when its work ends.
+func (u *Updater) newWork(why error) (ctx context.Context, ok bool) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.closed {
+		return nil, false
+	}
+	if u.abort != nil {
+		u.abort(why)
+	}
+	u.work, u.abort = context.WithCancelCause(context.Background())
+	u.running.Add(1)
+	return u.work, true
+}
+
+// joinWork is the context for an automatic round: the work running, which
+// it does not end, else a new one.
+func (u *Updater) joinWork() (ctx context.Context, ok bool) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.closed {
+		return nil, false
+	}
+	if u.work == nil || u.work.Err() != nil {
+		u.work, u.abort = context.WithCancelCause(context.Background())
+	}
+	u.running.Add(1)
+	return u.work, true
+}
+
 // round is one turn of the timer: a release another copy staged, then a
 // check when automatic updates are on and no other copy is checking.
 func (u *Updater) round() {
+	ctx, ok := u.joinWork()
+	if !ok {
+		return
+	}
+	defer u.running.Done()
 	u.readSettings()
-	u.readStaged()
+	u.readStaged(ctx)
 	if !u.cfg.Client.AutoUpdate() {
 		return
 	}
@@ -229,7 +284,7 @@ func (u *Updater) round() {
 		return
 	}
 	defer unlock()
-	u.check(false)
+	u.check(ctx, false)
 }
 
 // Check checks now, whether or not automatic updates are on. A release a
@@ -238,7 +293,7 @@ func (u *Updater) Check() {
 	if !u.takes(Idle, UpToDate, Ready, Failed) {
 		return
 	}
-	u.asked()
+	u.asked(errRetried)
 }
 
 // Retry stops the download running, or follows a failure Retry can help,
@@ -248,22 +303,29 @@ func (u *Updater) Retry() {
 	if s.Phase != Downloading && !(s.Phase == Failed && s.Kind.Retryable()) {
 		return
 	}
-	u.stopFetch(errRetried)
 	u.cfg.Logf("appupdate: retrying")
-	u.asked()
+	u.asked(errRetried)
 }
 
-// Cancel stops the download, or the checks after it, and shows nothing.
-// Automatic checks leave that release alone until a person asks.
+// Cancel stops the check, the download or the checks after it, and shows
+// nothing. Automatic checks leave a cancelled release alone until a person
+// asks.
 func (u *Updater) Cancel() {
-	s := u.State()
-	if s.Phase != Downloading && s.Phase != Verifying {
+	u.mu.Lock()
+	s := u.state
+	switch s.Phase {
+	case Checking, Downloading, Verifying:
+	default:
+		u.mu.Unlock()
 		return
 	}
-	u.mu.Lock()
-	u.declined = s.Version
+	if s.Version != "" {
+		u.declined = s.Version
+	}
+	if u.abort != nil {
+		u.abort(errCancelled)
+	}
 	u.mu.Unlock()
-	u.stopFetch(errCancelled)
 	u.cfg.Logf("appupdate: %s: cancelled", s.Version)
 	u.set(func(st *State) { *st = State{} })
 }
@@ -274,13 +336,15 @@ func (u *Updater) Cancel() {
 func (u *Updater) Relaunch() {
 	u.mu.Lock()
 	s, staged := u.state, u.staged
-	if s.Phase != Ready || staged == "" || u.busy {
+	if s.Phase != Ready || staged == "" || u.busy || u.closed {
 		u.mu.Unlock()
 		return
 	}
 	u.busy = true
+	u.running.Add(1)
 	u.mu.Unlock()
 	go func() {
+		defer u.running.Done()
 		defer func() {
 			u.mu.Lock()
 			u.busy = false
@@ -295,7 +359,7 @@ func (u *Updater) Relaunch() {
 			u.mu.Lock()
 			u.staged, u.stagedVersion = "", ""
 			u.mu.Unlock()
-			u.fail(s.Version, InstallFailed, err)
+			u.fail(nil, s.Version, InstallFailed, err)
 		}
 	}()
 }
@@ -310,9 +374,8 @@ func (u *Updater) SetChannel(name string) error {
 		return err
 	}
 	u.cfg.Logf("appupdate: following %s", name)
-	u.stopFetch(errRetried)
 	u.set(func(st *State) { *st = State{} })
-	u.asked()
+	u.asked(errRetried)
 	return nil
 }
 
@@ -343,55 +406,59 @@ func (u *Updater) takes(phases ...Phase) bool {
 	return false
 }
 
-// asked runs a check the person asked for: it waits for another copy's,
-// tries a refused or cancelled release again, and says how it went.
-func (u *Updater) asked() {
+// asked runs a check the person asked for, ending the work before it with
+// why: it waits for another copy's, tries a refused or cancelled release
+// again, and says how it went.
+func (u *Updater) asked(why error) {
 	if u.cfg.Client.Version() == "" {
-		u.fail("", Development, amarit.ErrDevelopment)
+		u.fail(nil, "", Development, amarit.ErrDevelopment)
 		return
 	}
-	u.set(func(st *State) { st.Phase, st.Kind, st.Error = Checking, "", "" })
+	ctx, ok := u.newWork(why)
+	if !ok {
+		return
+	}
+	u.setFor(ctx, func(st *State) { *st = State{Phase: Checking} })
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), u.cfg.LockWait)
-		unlock, err := u.cfg.Client.Lock(ctx)
+		defer u.running.Done()
+		lctx, cancel := context.WithTimeout(ctx, u.cfg.LockWait)
+		unlock, err := u.cfg.Client.Lock(lctx)
 		cancel()
 		if err != nil {
-			u.fail("", Busy, err)
+			u.fail(ctx, "", Busy, err)
 			return
 		}
 		defer unlock()
+		if ctx.Err() != nil {
+			return
+		}
 		if err := u.cfg.Client.Unreject(); err != nil {
 			u.cfg.Logf("appupdate: %v", err)
 		}
 		u.mu.Lock()
 		u.declined = ""
 		u.mu.Unlock()
-		u.readStaged()
-		u.check(true)
+		u.readStaged(ctx)
+		u.check(ctx, true)
 	}()
 }
 
 // readSettings brings the settings another copy changed into the state.
-func (u *Updater) readSettings() {
-	ch, auto := u.cfg.Client.Channel(), u.cfg.Client.AutoUpdate()
-	u.set(func(st *State) { st.Channel, st.AutoUpdate = ch, auto })
-}
+func (u *Updater) readSettings() { u.set(func(st *State) {}) }
 
 // readStaged offers a release another copy staged, once it is newer than
 // this one.
-func (u *Updater) readStaged() {
+func (u *Updater) readStaged(ctx context.Context) {
 	staged, v := u.cfg.Installer.Staged()
 	if staged == "" || !u.newer(v) {
 		return
 	}
-	u.mu.Lock()
-	u.staged, u.stagedVersion = staged, v
-	u.mu.Unlock()
-	u.set(func(st *State) {
+	u.setFor(ctx, func(st *State) {
+		u.staged, u.stagedVersion = staged, v
 		switch st.Phase {
 		case Downloading, Verifying, Checking:
 		default:
-			*st = State{Phase: Ready, Version: v, Channel: st.Channel, AutoUpdate: st.AutoUpdate}
+			*st = State{Phase: Ready, Version: v}
 		}
 	})
 }
@@ -404,16 +471,19 @@ func (u *Updater) newer(v string) bool {
 // check is one look at the manifest, and the download and checks when it
 // names a newer release. The caller holds the lock. An automatic check only
 // logs a manifest it couldn't read, and leaves a cancelled release alone.
-func (u *Updater) check(asked bool) {
+func (u *Updater) check(ctx context.Context, asked bool) {
 	if err := u.cfg.Installer.Usable(); err != nil {
-		u.fail("", kindOf(err, Unchecked), err)
+		u.fail(ctx, "", kindOf(err, Unchecked), err)
 		return
 	}
-	d, err := u.cfg.Client.Check(context.Background())
+	d, err := u.cfg.Client.Check(ctx)
+	if ctx.Err() != nil {
+		return
+	}
 	if err != nil {
 		u.cfg.Logf("appupdate: check: %v", err)
 		if asked {
-			u.fail("", Offline, err)
+			u.fail(ctx, "", Offline, err)
 		}
 		return
 	}
@@ -421,85 +491,69 @@ func (u *Updater) check(asked bool) {
 	u.mu.Lock()
 	staged, stagedVersion, declined := u.staged, u.stagedVersion, u.declined
 	u.mu.Unlock()
-	ready := func(st *State) {
-		*st = State{Phase: Ready, Version: stagedVersion, Channel: st.Channel, AutoUpdate: st.AutoUpdate}
-	}
 	switch {
 	case staged != "" && (!d.Update || stagedVersion == d.Version):
 		// What is staged is what the channel names, or newer than it.
-		u.set(func(st *State) {
+		u.setFor(ctx, func(st *State) {
 			if st.Phase == Checking || st.Phase == Idle {
-				ready(st)
+				*st = State{Phase: Ready, Version: stagedVersion}
 			}
 		})
 	case !d.Update:
-		u.set(func(st *State) {
+		u.setFor(ctx, func(st *State) {
 			switch {
 			case st.Phase == Checking:
-				*st = State{Phase: UpToDate, Channel: st.Channel, AutoUpdate: st.AutoUpdate}
+				*st = State{Phase: UpToDate}
 			case st.Phase == Failed && st.Version != d.Version:
 				// The failure was a release the channel no longer names.
-				*st = State{Channel: st.Channel, AutoUpdate: st.AutoUpdate}
+				*st = State{}
 			}
 		})
 	case !asked && declined == d.Version:
 		u.cfg.Logf("appupdate: %s was cancelled; waiting for a check a person asks for", d.Version)
 	default:
-		u.fetch(d)
+		u.fetch(ctx, d)
 	}
 }
 
 // fetch downloads the release, has the installer check and stage it, and
 // shows it ready. A refusal rejects the release, so it is downloaded once,
-// not every round.
-func (u *Updater) fetch(d *amarit.Decision) {
-	ctx, cancel := context.WithCancelCause(context.Background())
-	defer cancel(nil)
-	a := &attempt{version: d.Version, stop: cancel}
-	u.mu.Lock()
-	u.fetching = a
-	u.mu.Unlock()
-	defer func() {
-		u.mu.Lock()
-		if u.fetching == a {
-			u.fetching = nil
-		}
-		u.mu.Unlock()
-	}()
-	u.mu.Lock()
-	// A new download replaces what is staged.
-	u.staged, u.stagedVersion = "", ""
-	u.mu.Unlock()
-	u.set(func(st *State) {
-		*st = State{Phase: Downloading, Version: d.Version, Total: d.Asset.Size, Channel: st.Channel, AutoUpdate: st.AutoUpdate}
-	})
-	dir := filepath.Join(u.cfg.Dir, "download")
-	os.RemoveAll(dir)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		u.fail(d.Version, Network, err)
+// not every round. Once ctx ends it changes nothing more.
+func (u *Updater) fetch(ctx context.Context, d *amarit.Decision) {
+	if !u.setFor(ctx, func(st *State) {
+		// A new download replaces what is staged.
+		u.staged, u.stagedVersion = "", ""
+		*st = State{Phase: Downloading, Version: d.Version, Total: d.Asset.Size}
+	}) {
 		return
 	}
+	dir := filepath.Join(u.cfg.Dir, "download")
+	os.RemoveAll(dir)
 	defer os.RemoveAll(dir)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		u.fail(ctx, d.Version, Network, err)
+		return
+	}
 	file, err := u.cfg.Client.Download(ctx, d, dir,
 		amarit.StallAfter(u.cfg.StallAfter),
 		amarit.OnProgress(func(done, total int64) {
-			u.set(func(st *State) {
+			u.setFor(ctx, func(st *State) {
 				if st.Phase == Downloading && st.Version == d.Version {
 					st.Done, st.Total = done, total
 				}
 			})
 		}))
-	if stopped(ctx) {
+	if ctx.Err() != nil {
 		return
 	}
 	if err != nil {
 		u.cfg.Logf("appupdate: %s: %v", d.Version, err)
-		u.fail(d.Version, kindOf(err, Network), err)
+		u.fail(ctx, d.Version, kindOf(err, Network), err)
 		return
 	}
-	u.set(func(st *State) { st.Phase, st.Done, st.Total = Verifying, 0, 0 })
+	u.setFor(ctx, func(st *State) { st.Phase, st.Done, st.Total = Verifying, 0, 0 })
 	staged, err := u.cfg.Installer.Prepare(ctx, file, d.Version)
-	if stopped(ctx) {
+	if ctx.Err() != nil {
 		return
 	}
 	if err != nil {
@@ -509,32 +563,14 @@ func (u *Updater) fetch(d *amarit.Decision) {
 				u.cfg.Logf("appupdate: %v", rerr)
 			}
 		}
-		u.fail(d.Version, kindOf(err, Unchecked), err)
+		u.fail(ctx, d.Version, kindOf(err, Unchecked), err)
 		return
 	}
-	u.mu.Lock()
-	u.staged, u.stagedVersion = staged, d.Version
-	u.mu.Unlock()
 	u.cfg.Logf("appupdate: %s is staged at %s", d.Version, staged)
-	u.set(func(st *State) {
-		*st = State{Phase: Ready, Version: d.Version, Channel: st.Channel, AutoUpdate: st.AutoUpdate}
+	u.setFor(ctx, func(st *State) {
+		u.staged, u.stagedVersion = staged, d.Version
+		*st = State{Phase: Ready, Version: d.Version}
 	})
-}
-
-// stopped says the person's Cancel or Retry stopped the attempt; those set
-// the state themselves.
-func stopped(ctx context.Context) bool {
-	why := context.Cause(ctx)
-	return errors.Is(why, errCancelled) || errors.Is(why, errRetried)
-}
-
-func (u *Updater) stopFetch(why error) {
-	u.mu.Lock()
-	a := u.fetching
-	u.mu.Unlock()
-	if a != nil {
-		a.stop(why)
-	}
 }
 
 // kindOf is the kind of a failure, from amarit's errors, else fallback.
@@ -554,21 +590,31 @@ func kindOf(err error, fallback Kind) Kind {
 	return fallback
 }
 
-func (u *Updater) fail(version string, k Kind, err error) {
-	u.set(func(st *State) {
-		*st = State{Phase: Failed, Version: version, Kind: k, Error: err.Error(), Channel: st.Channel, AutoUpdate: st.AutoUpdate}
+// fail shows a failure, unless ctx, the work it came from, has ended.
+func (u *Updater) fail(ctx context.Context, version string, k Kind, err error) {
+	u.setFor(ctx, func(st *State) {
+		*st = State{Phase: Failed, Version: version, Kind: k, Error: err.Error()}
 	})
 }
 
 // set changes the state and tells the listeners when it changed.
-func (u *Updater) set(f func(*State)) {
+func (u *Updater) set(f func(*State)) { u.setFor(nil, f) }
+
+// setFor changes the state for the work of ctx, and says whether it did:
+// once that work has ended, nothing changes. The settings are read again,
+// and the listeners hear the change in the order it was made.
+func (u *Updater) setFor(ctx context.Context, f func(*State)) bool {
+	ch, auto := u.cfg.Client.Channel(), u.cfg.Client.AutoUpdate()
 	u.mu.Lock()
+	defer u.mu.Unlock()
+	if ctx != nil && ctx.Err() != nil {
+		return false
+	}
 	was := u.state
 	f(&u.state)
-	u.state.Channel, u.state.AutoUpdate = u.cfg.Client.Channel(), u.cfg.Client.AutoUpdate()
-	now := u.state
-	u.mu.Unlock()
-	if now != was {
-		u.events.push(now)
+	u.state.Channel, u.state.AutoUpdate = ch, auto
+	if u.state != was {
+		u.events.push(u.state)
 	}
+	return true
 }

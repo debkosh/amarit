@@ -309,3 +309,75 @@ func TestADevelopmentBuildNeverUpdates(t *testing.T) {
 		t.Fatalf("settings: %v %+v", err, u.State())
 	}
 }
+
+// Retry then Cancel at once, as a quick double press does: nothing is left
+// running, and Close returns with no download on disk.
+func TestRetryThenCancelLeavesNothingRunning(t *testing.T) {
+	for i := range 20 {
+		r := newRig(t, "1.0.0")
+		hang := make(chan struct{})
+		r.rel.mu.Lock()
+		r.rel.hang = hang
+		r.rel.mu.Unlock()
+		r.u.Check()
+		r.waitFor("downloading", phase(Downloading))
+		r.u.Retry()
+		r.u.Cancel()
+		time.Sleep(time.Duration(i%4) * 100 * time.Millisecond)
+		if s := r.u.State(); s.Phase != Idle {
+			t.Fatalf("run %d: after Cancel: %+v", i, s)
+		}
+		r.u.Close()
+		close(hang)
+		if s := r.u.State(); s.Phase != Idle {
+			t.Fatalf("run %d: after Close: %+v", i, s)
+		}
+		if _, err := os.Stat(filepath.Join(r.u.cfg.Dir, "download")); !os.IsNotExist(err) {
+			t.Fatalf("run %d: a download is left after Close: %v", i, err)
+		}
+	}
+}
+
+// Cancel while a check runs stops the download it would have started.
+func TestCancelWhileChecking(t *testing.T) {
+	r := newRig(t, "1.0.0")
+	unlock, ok, _ := r.c.TryLock() // another copy holds the lock, so the check waits
+	if !ok {
+		t.Fatal("lock")
+	}
+	r.u.Check()
+	r.waitFor("checking", phase(Checking))
+	r.u.Cancel()
+	unlock()
+	time.Sleep(300 * time.Millisecond)
+	if s := r.u.State(); s.Phase != Idle {
+		t.Fatalf("after Cancel while checking: %+v", s)
+	}
+	r.u.Close()
+}
+
+// Close ends a download that is still arriving and waits for it.
+func TestCloseEndsADownload(t *testing.T) {
+	r := newRig(t, "1.0.0")
+	hang := make(chan struct{})
+	defer close(hang)
+	r.rel.mu.Lock()
+	r.rel.hang = hang
+	r.rel.mu.Unlock()
+	r.u.Check()
+	r.waitFor("downloading", phase(Downloading))
+	done := make(chan struct{})
+	go func() { r.u.Close(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Close did not return")
+	}
+	if _, err := os.Stat(filepath.Join(r.u.cfg.Dir, "download")); !os.IsNotExist(err) {
+		t.Fatalf("a download is left after Close: %v", err)
+	}
+	r.u.Check()
+	if s := r.u.State(); s.Phase == Checking {
+		t.Fatal("a closed updater took Check")
+	}
+}

@@ -37,14 +37,14 @@ It is JSON as it is.
 | `channel`, `autoUpdate` | the settings every copy sharing the state follows |
 
 In: `Check()`, `Retry()`, `Cancel()`, `Relaunch()`, and
-`SetChannel(name)`, `SetAutoUpdate(on)`. A command sent in a phase that
+`SetChannel(name)`, `SetAutoUpdate(on)`; `Close()` when the app quits. A command sent in a phase that
 does not take it does nothing, so a view only shows the buttons this table
 gives its phase:
 
 | Phase | What it means | Check | Cancel | Retry | Relaunch |
 |---|---|---|---|---|---|
 | `""` idle | nothing to show | yes | | | |
-| `checking` | a check the person asked for | | | | |
+| `checking` | a check the person asked for | | yes | | |
 | `current` | that check found nothing newer | yes | | | |
 | `downloading` | `done` of `total` | | yes | yes | |
 | `verifying` | the download is unpacked and checked | | yes | | |
@@ -75,7 +75,13 @@ Behaviour behind the table:
   staged, then checks if automatic updates are on and no other copy holds
   the lock.
 - **Cancel** shows nothing again, and automatic rounds leave that release
-  alone until a person checks.
+  alone until a person checks. It ends whatever work is current, a check
+  that is about to download included, so a quick Retry then Cancel leaves
+  nothing running.
+- **Close** ends the rounds and any work, and returns once a download has
+  stopped and its files are gone; the updater takes no command after it. An
+  app calls it as it quits, and a test at its end. `Stop` ends only the
+  rounds.
 - **Refused** releases are rejected on the install, so a bad release is
   downloaded once, not every round. A check a person asks for means "try
   it": it forgets the rejection and the cancel.

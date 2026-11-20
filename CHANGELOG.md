@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.10.4
+
+- **appupdate: Cancel right after Retry stops everything.** Retry's new
+  check waited for the lock while Cancel, finding the phase `checking`,
+  did nothing, so a download started after a Cancel the state showed as
+  done. Work now runs under a context that Cancel, Retry, SetChannel and
+  Close end, after which it changes no state and starts no download.
+  `checking` takes Cancel. Found by Project B's tests, about one run in six.
+- **`appupdate.Updater.Close`** ends the rounds and any work and returns
+  once a download has stopped and its files are gone, for an app that quits
+  and a test that ends.
+
 ## v0.10.3
 
 - **A Client with no version is a development build.** It keeps the
