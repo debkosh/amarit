@@ -129,6 +129,48 @@ func TestDaemonAdoptsAfterRestart(t *testing.T) {
 	waitFor(t, "adopted process to be stopped", func() bool { return !processAlive(pid) })
 }
 
+// A unit its restart policy left exited stays exited when the daemon
+// restarts, as it does for an update; a changed unit file still runs it.
+func TestDaemonRestartLeavesExitedUnitsExited(t *testing.T) {
+	dir := t.TempDir()
+	base := Base(filepath.Join(dir, "base"))
+	runs := filepath.Join(dir, "runs")
+	once := script(t, dir, "once", `echo run >> `+runs)
+	if err := base.SaveUnit(Unit{Name: "once", Binary: once, Restart: "never"}); err != nil {
+		t.Fatal(err)
+	}
+	count := func() int {
+		b, _ := os.ReadFile(runs)
+		return strings.Count(string(b), "run")
+	}
+
+	first := NewDaemon(base)
+	first.tick = 50 * time.Millisecond
+	ctx1, cancel1 := context.WithCancel(context.Background())
+	go first.Run(ctx1)
+	waitFor(t, "the unit to run and exit", func() bool {
+		s, _ := base.Statuses()
+		return count() == 1 && s["once"].State == "exited"
+	})
+	cancel1()
+	waitFor(t, "first daemon to release its pid file", func() bool { return base.DaemonPID() == 0 })
+
+	second := NewDaemon(base)
+	second.tick = 50 * time.Millisecond
+	runDaemon(t, second)
+	time.Sleep(500 * time.Millisecond)
+	if n := count(); n != 1 {
+		t.Fatalf("the restarted daemon ran the exited unit again: %d runs", n)
+	}
+	if s, _ := base.Statuses(); s["once"].State != "exited" {
+		t.Fatalf("state after the restart: %+v", s["once"])
+	}
+	if err := base.SaveUnit(Unit{Name: "once", Binary: once, Restart: "never", Args: []string{"again"}}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "a changed unit file to run it again", func() bool { return count() == 2 })
+}
+
 func TestUnitValidationAndEnvFile(t *testing.T) {
 	base := Base(t.TempDir())
 	if err := base.SaveUnit(Unit{Name: "bad name", Binary: "/bin/true"}); err == nil {

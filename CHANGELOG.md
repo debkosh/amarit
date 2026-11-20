@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.8.1
+
+- **A daemon that restarts leaves exited units exited.** A unit its restart
+  policy had left exited (`restart: never`, or `on-failure` after a clean
+  exit) was started again by the next daemon: the exit was remembered only
+  in memory, so an update or a reboot ran every finished one-shot unit once
+  more. The new daemon reads the exits from the run state the old one
+  wrote, so this release's own update replays nothing. A changed unit file
+  still runs the unit again.
+
 ## v0.8.0
 
 Release channels, as Project B built them by hand on top of amarit.

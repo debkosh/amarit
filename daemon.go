@@ -466,13 +466,31 @@ func (d *Daemon) Drain(ctx context.Context) {
 	}()
 }
 
-// adopt picks up processes that a previous daemon started and left alive.
+// adopt picks up processes that a previous daemon started and left alive,
+// and the units it had left exited by their restart policy, which stay
+// exited: a daemon that restarts, for an update or a reboot, must not run a
+// one-shot unit again.
 func (d *Daemon) adopt() {
 	statuses, _ := d.base.Statuses()
+	units := map[string]Unit{}
+	if all, err := d.base.Units(); err == nil {
+		for _, u := range all {
+			for _, c := range u.instances() {
+				units[c.Name] = c
+			}
+		}
+	}
 	for name, s := range statuses {
-		if s.PID != 0 && processAlive(s.PID) {
+		switch {
+		case s.PID != 0 && processAlive(s.PID):
 			d.children[name] = &child{unit: Unit{Name: name}, pid: s.PID, started: s.Since, restarts: s.Restarts, done: watchPID(s.PID)}
 			log.Printf("amarit: adopted %s (pid %d)", name, s.PID)
+		case s.State == "exited":
+			// Parked with the unit as it is now, so only a changed unit
+			// file starts it again, as in the daemon that parked it.
+			if u, ok := units[name]; ok {
+				d.children[name] = &child{unit: u, parked: true, started: s.Since, restarts: s.Restarts, lastExit: s.LastExit, backoff: time.Second}
+			}
 		}
 	}
 }
