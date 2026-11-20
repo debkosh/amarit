@@ -224,6 +224,19 @@ each build and then the release 0.3.9 when it ships. `0.3.8+g<sha>` does
 not work on the desktop: semver ignores build metadata for order, and the
 updater takes only a newer version.
 
+An APK's `versionCode` comes from the same name with its pre-release part
+dropped, `major*1000000 + minor*1000 + patch`:
+
+```sh
+CODE=$(amarit version-code "$V")          # 3009 for 0.3.9-dev.* and for 0.3.9
+```
+
+Give it to the APK build and to `amarit release -version-code`. Every dev
+build of 0.3.9 and the release 0.3.9 share 3009; a phone takes an equal
+code with a newer name as an update, so it follows the dev builds and then
+the release (spec, section 3). A Gradle build that computes the code
+itself uses the same formula.
+
 ## How an update runs
 
 ```

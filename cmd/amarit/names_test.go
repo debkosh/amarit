@@ -30,3 +30,17 @@ func TestRollingNameOrders(t *testing.T) {
 		}
 	}
 }
+
+// Every rolling build of a version and the release itself share one code.
+func TestVersionCode(t *testing.T) {
+	for v, want := range map[string]int{"0.3.9": 3009, "v0.3.9-dev.202611201415": 3009, "1.2.3+gabc": 1002003, "2099.999.999": 2099999999} {
+		if got, err := codeOf(v); err != nil || got != want {
+			t.Fatalf("codeOf(%s) = %d, %v; want %d", v, got, err, want)
+		}
+	}
+	for _, bad := range []string{"0.1000.0", "0.0.1000", "2100.0.0", "1.2", "x.y.z"} {
+		if _, err := codeOf(bad); err == nil {
+			t.Fatalf("codeOf(%s) must be refused", bad)
+		}
+	}
+}

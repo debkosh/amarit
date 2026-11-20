@@ -46,6 +46,38 @@ func rollingName(released, pre string, t time.Time) (string, error) {
 	return fmt.Sprintf("%d.%d.%d-%s.%s", n[0], n[1], n[2]+1, pre, t.UTC().Format("200601021504")), nil
 }
 
+// versionCode prints the Android versionCode of a version:
+// major*1000000 + minor*1000 + patch, with any pre-release part dropped, so
+// every rolling build of 0.3.9 and the release 0.3.9 share 3009. Android
+// takes an equal code with a newer name as an update (spec, section 3).
+func versionCode(args []string) error {
+	if len(args) != 1 {
+		return errors.New("usage: amarit version-code <version>")
+	}
+	c, err := codeOf(args[0])
+	if err != nil {
+		return err
+	}
+	fmt.Println(c)
+	return nil
+}
+
+func codeOf(version string) (int, error) {
+	core := strings.TrimPrefix(version, "v")
+	if i := strings.IndexAny(core, "-+"); i >= 0 {
+		core = core[:i]
+	}
+	n, err := releaseNumbers(core)
+	if err != nil {
+		return 0, err
+	}
+	// 2100000000 is the largest versionCode Google Play accepts.
+	if n[1] > 999 || n[2] > 999 || n[0] > 2099 {
+		return 0, fmt.Errorf("version %s: a versionCode needs minor and patch below 1000 and major below 2100", version)
+	}
+	return n[0]*1000000 + n[1]*1000 + n[2], nil
+}
+
 // releaseNumbers parses a plain release version, major.minor.patch with an
 // optional leading v, and nothing after it.
 func releaseNumbers(v string) ([3]int, error) {

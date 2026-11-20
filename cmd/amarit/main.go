@@ -5,6 +5,7 @@
 //	amarit release [-config amarit.json] -version 0.5.3 -dist dist [-channel stable] [-out releases.json]
 //	amarit release -version 0.2.1+g6c3c4d4 -version-code 3 -channel latest -asset app-latest.apk -url https://.../app-latest.apk -prune
 //	amarit next-version [-pre dev] 0.3.8
+//	amarit version-code 0.3.9-dev.202611201415
 //	amarit update  [-check] [-rolling] [unit|glob ...]
 package main
 
@@ -40,6 +41,8 @@ func main() {
 		err = release(os.Args[2:])
 	case "next-version":
 		err = nextVersion(os.Args[2:])
+	case "version-code":
+		err = versionCode(os.Args[2:])
 	case "install":
 		err = install(os.Args[2:])
 	case "uninstall":
@@ -129,6 +132,8 @@ keep it current (release side):
                                                                  -prune drops releases no channel points at
   amarit next-version [-pre dev] X                               the name of a rolling build after release X:
                                                                  0.3.9-dev.<UTC minute> after 0.3.8, which semver orders
+  amarit version-code X                                          the APK versionCode of X, its pre-release part dropped:
+                                                                 major*1000000 + minor*1000 + patch, 3009 for 0.3.9-dev.*
 
 A program built with amarit updates itself: '<program> update' or '<program> --auto-update'.`)
 }
