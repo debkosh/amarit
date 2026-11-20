@@ -286,6 +286,26 @@ gh release create "v$VERSION" dist/App-* --title "$VERSION" --notes-file notes.m
 amarit publish -github o/r -tag channels -version "$VERSION" -version-code "$CODE" -dist dist
 ```
 
+## Moving the manifest
+
+A copy reads the address it was built with, `releases` in its
+`amarit.json`, and nothing tells it of another. To move the manifest, to a
+fixed-tag release for channels or to another host, release a version
+whose `releases` is the new address, and from then on publish the same
+manifest to both addresses: copies that predate the move find the new
+version at the old one, and once they take it they read the new one. Old
+copies follow the channel they were built with, normally stable, so the
+old address needs only what a stable release publishes. Moving from
+`releases/latest/download/` to `channels`, each stable release goes on
+carrying the manifest as its own asset, after `amarit publish` wrote it:
+
+```sh
+gh release upload "v$VERSION" dist/releases.json --clobber
+```
+
+Stop when you are willing to strand any copy that has not updated since
+the move; nothing on the client side reports which address it read.
+
 ## How an update runs
 
 ```

@@ -18,7 +18,11 @@ fetched the same way; a build that publishes to a directory on the machine
 that runs the program needs no server. A publisher on GitHub attaches the
 files to a release so
 `https://github.com/<owner>/<repo>/releases/latest/download/releases.json` is
-a stable URL. Any host works; nothing in the spec depends on GitHub. Only
+a stable URL, or, for channels with pre-releases, which `latest` skips, on
+one release with a fixed tag (`.../releases/download/channels/releases.json`).
+A client reads the one address it was built with, so a publisher that moves
+the manifest publishes to both until the copies on the old address have
+updated. Any host works; nothing in the spec depends on GitHub. Only
 `https` protects the transport; `http` and `file` rely on the hashes alone,
 so they belong on the same machine or a trusted network.
 
