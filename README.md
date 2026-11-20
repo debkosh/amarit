@@ -108,6 +108,8 @@ default. [Self-updating programs](#self-updating-programs) below has more.
 |---|---|
 | `amarit run [-name N] <cmd> [args...]` | keep a command running (also `-instances N`, `-restart on-failure`, `-dir D`, `-env-file F`) |
 | `amarit ls` | list every program with its state, pid and restart count |
+| `amarit job [-name N] [-log F] -- <cmd> [args...]` | run a command once, off this shell: a build, a test run (also `-dir D`, `-env-file F`) |
+| `amarit jobs` | list the jobs running now |
 | `amarit logs [-f] <name>` | show its output; `-f` follows |
 | `amarit restart <name\|glob> [-rolling]` | restart now; `-rolling` does one copy at a time |
 | `amarit stop <name>` / `amarit start <name>` | take it down and keep it down, or bring it back |
@@ -121,6 +123,7 @@ Names take a single copy (`worker@2`) or a glob (`'web-*'`).
 amarit run -name worker -instances 4 ./worker          # four copies: worker@1 .. worker@4
 amarit run -name tunnel ssh -N -R 7900:127.0.0.1:7900 vps
 amarit restart 'worker@*' -rolling                     # each must stay up 2 s before the next
+amarit job -name build -log build.log -- make release  # once; build.log ends "amarit job build: exit 0"
 ```
 
 ## What you get

@@ -56,8 +56,20 @@ func main() {
 		err = run(os.Args[2:])
 	case "ls", "status":
 		err = ls(os.Args[2:])
+	case "job":
+		err = startJob(os.Args[2:])
+	case "jobs":
+		err = showJobs(os.Args[2:])
+	case "__job":
+		// Hidden: a job's keeper.
+		err = keepJob(os.Args[2:])
 	case "stop":
-		err = named(os.Args[2:], func(n string) error { return amarit.DefaultBase().Enable(n, false) })
+		err = named(os.Args[2:], func(n string) error {
+			if isJob(n) {
+				return stopJob(n, 10*time.Second)
+			}
+			return amarit.DefaultBase().Enable(n, false)
+		})
 	case "start":
 		err = start(os.Args[2:])
 	case "restart":
@@ -108,6 +120,12 @@ keep it alive (this machine):
                                    -instances N runs N copies named <name>@1..N; refuses a
                                    program launchd or systemd already runs unless -force
   amarit ls                        every unit, its state, pid, restarts
+  amarit job [-name N] [-dir D] [-env-file F] [-log F] [--] <command> [args...]
+                                   run a command once, off this shell: never restarted, not by
+                                   a daemon restart, an update or a reboot; -log F appends its
+                                   output and a last "amarit job N: exit 0" line to F; amarit
+                                   forgets the job once it ends
+  amarit jobs                      the jobs running now; amarit logs and stop take a job's name
   amarit logs [-f] <unit>[@<i>]    a unit's output, or one instance's
   amarit stop <unit>[@<i>]         stop a unit, or one instance of it
   amarit start [-force] <unit>[@<i>]

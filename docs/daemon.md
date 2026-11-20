@@ -47,6 +47,36 @@ Stopping the daemon never stops its units, and a new daemon adopts them.
 The daemon never touches a unit's binary: updates are the program's own
 business, below.
 
+## Jobs
+
+A unit is kept running, and comes back after a daemon restart or a reboot.
+A command meant to run once, a build or a test run, is a job:
+
+```sh
+amarit job [-name N] [-dir D] [-env-file F] [-log F] [--] <command> [args...]
+```
+
+- It runs once and nothing starts it again: not a daemon restart, an update
+  or a reboot.
+- It runs off the shell that started it, in a session of its own, with that
+  shell's environment, in its directory unless `-dir` names another, and with
+  `-env-file`'s lines added.
+- A small amarit process, the job's keeper, waits for it. The daemon plays no
+  part, and the keeper runs from its own image, so updating the daemon or
+  replacing the amarit binary cannot stop or orphan a running job.
+- `amarit jobs` lists the jobs running now; `amarit logs [-f] N` and `amarit
+  stop N` take a job's name. Stop sends SIGTERM to the job's process group,
+  and SIGKILL to what is left 10 s later.
+- `-log F` appends the output to F and, at the end, one line saying how it
+  ended: `amarit job N: exit 3`, `amarit job N: killed: terminated`. A job
+  without `-log` has its output in `~/.amarit/jobs/N.log` while it runs.
+- amarit forgets a job once it ends: its record, and its log when it had no
+  `-log`, go. A job a reboot ended leaves a `-log` file with no last line,
+  and the next `amarit jobs` forgets it.
+
+The default name is the command's and the time, `make-20261120-151500`; a
+name in use by a running job is refused.
+
 ## The daemon updates itself
 
 The daemon does keep *itself* current, using the library like any other

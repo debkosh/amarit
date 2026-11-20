@@ -491,17 +491,27 @@ func logs(args []string) error {
 		return errors.New("usage: amarit logs [-f] <unit>[@<i>]")
 	}
 	base := amarit.DefaultBase()
-	names, err := instanceNames(base, fs.Arg(0))
-	if err != nil {
-		return err
+	var files []string
+	if isJob(fs.Arg(0)) {
+		p, err := jobLogPath(fs.Arg(0))
+		if err != nil {
+			return err
+		}
+		files = []string{p}
+	} else {
+		names, err := instanceNames(base, fs.Arg(0))
+		if err != nil {
+			return err
+		}
+		for _, n := range names {
+			files = append(files, filepath.Join(string(base), "logs", n+".log"))
+		}
 	}
 	tailArgs := []string{"-n", "50"}
 	if *follow {
 		tailArgs = append(tailArgs, "-f")
 	}
-	for _, n := range names {
-		tailArgs = append(tailArgs, filepath.Join(string(base), "logs", n+".log"))
-	}
+	tailArgs = append(tailArgs, files...)
 	tail := exec.Command("tail", tailArgs...)
 	tail.Stdout, tail.Stderr = os.Stdout, os.Stderr
 	return tail.Run()

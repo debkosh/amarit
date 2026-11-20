@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.8.2
+
+- **`amarit job [-name N] [-dir D] [-env-file F] [-log F] -- <cmd>`**: a
+  command run once, off the shell, never started again by a daemon restart,
+  an update or a reboot. Its keeper is not the daemon's, so neither updating
+  the daemon nor replacing the amarit binary touches it. `amarit jobs` lists
+  the running ones, `amarit logs` and `amarit stop` take a job's name, and
+  `-log F` ends the caller's file with `amarit job N: exit 0`. amarit keeps
+  nothing of a job once it ends. One-shot work no longer needs a unit with
+  `restart: never`, which a daemon restart ran again before v0.8.1.
+
 ## v0.8.1
 
 - **A daemon that restarts leaves exited units exited.** A unit its restart

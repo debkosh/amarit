@@ -767,3 +767,7 @@ func rotateLog(path string) {
 		_ = os.Truncate(path, 0)
 	}
 }
+
+// ReadEnvFile reads a file of KEY=VALUE lines as a unit's env_file is read:
+// blank lines and # comments skipped, an "export " prefix and quotes dropped.
+func ReadEnvFile(path string) ([]string, error) { return readEnvFile(path) }
