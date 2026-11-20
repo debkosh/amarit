@@ -156,6 +156,13 @@ One sidecar directory beside the binary, `<bin>.amarit/`:
 | `bad` | a binary that was rolled back from, kept for inspection |
 | `lock` | held for the whole swap, so processes sharing the binary update it once |
 
+A program that installs itself (a client with no binary to swap) names its
+state directory instead, which holds `id` and `state.json` as above and
+`settings.json`, the person's choices shared by every copy using that
+directory: `channel`, the channel followed instead of the one the program
+starts with, and `auto_update`, the automatic-updates switch, each absent
+until chosen.
+
 ## 8. Project configuration: `amarit.json`
 
 One JSON file at the repository root, read by `amarit release` to build the

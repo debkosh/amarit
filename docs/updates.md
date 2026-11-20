@@ -162,6 +162,15 @@ if d.Update {
 
 `stateDir` holds the install id and the state kept between runs, which the
 in-place updater keeps beside the binary; a signed bundle has no such place.
+
+It also holds what a person picks in the program, `settings.json`, shared
+by every copy that uses the same directory. `c.SetChannel("dev")` switches
+the channel; `c.Check` reads it each time, so the other copies follow from
+their next check. `c.SetAutoUpdate(false)` records the automatic-updates
+switch and `c.AutoUpdate()` reads it back, the project's `auto_update`
+until someone chooses; the program runs its own checks and consults it.
+The updater never goes back a version, so a copy on a dev build that picks
+stable stays on that build until a stable release passes it.
 The manifest, the asset pattern and `amarit release` are the same as for a
 binary, with the bundle's archive as the asset.
 

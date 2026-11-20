@@ -2,8 +2,10 @@ package amarit
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -93,5 +95,51 @@ func TestClientUnrejectOffersTheVersionAgain(t *testing.T) {
 	}
 	if d, err := c.Check(context.Background()); err != nil || !d.Update {
 		t.Fatalf("an unrejected release should be offered: %v %+v", err, d)
+	}
+}
+
+// Two copies sharing a state directory: a channel picked in one is followed
+// by the other at its next check, and so is the automatic-updates switch.
+func TestClientSettingsAreShared(t *testing.T) {
+	both := func(assetURL string) string {
+		return fmt.Sprintf(`{"spec":1,"project":"demo","published":"2026-10-09T00:00:00Z",
+		  "channels":{"stable":"0.5.0","dev":"0.5.1-dev.202611201415"},
+		  "releases":{"0.5.0":{"assets":{}},"0.5.1-dev.202611201415":{"assets":{"%s/%s":{"url":"%s","sha256":"%s","size":%d}}}}}`,
+			runtime.GOOS, runtime.GOARCH, assetURL, assetSHA, assetSize)
+	}
+	srv := serve(t, both, assetBody)
+	state := t.TempDir()
+	open := func() *Client {
+		c, err := NewClient(state, "stable", Project("demo"), Version("0.5.0"), Releases(srv.URL+"/releases.json"), AutoUpdate(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.u.client = srv.Client()
+		return c
+	}
+	one, two := open(), open()
+	if two.Channel() != "stable" || !two.AutoUpdate() {
+		t.Fatalf("defaults: %s %v", two.Channel(), two.AutoUpdate())
+	}
+	if d, err := two.Check(context.Background()); err != nil || d.Update {
+		t.Fatalf("stable has nothing newer: %v %+v", err, d)
+	}
+	if err := one.SetChannel("dev"); err != nil {
+		t.Fatal(err)
+	}
+	if err := one.SetAutoUpdate(false); err != nil {
+		t.Fatal(err)
+	}
+	if two.Channel() != "dev" || two.AutoUpdate() {
+		t.Fatalf("after the other copy chose: %s %v", two.Channel(), two.AutoUpdate())
+	}
+	if d, err := two.Check(context.Background()); err != nil || !d.Update || d.Version != "0.5.1-dev.202611201415" {
+		t.Fatalf("dev build should be offered: %v %+v", err, d)
+	}
+	if err := one.SetChannel("de v"); err == nil {
+		t.Fatal("a channel with a space must be refused")
+	}
+	if left, _ := filepath.Glob(filepath.Join(state, "settings-*")); len(left) != 0 {
+		t.Fatalf("temporary files left: %v", left)
 	}
 }
