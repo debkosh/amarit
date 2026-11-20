@@ -366,7 +366,10 @@ Decisions, and what was not taken:
   Each CI job downloads it, merges its channel, re-uploads; a concurrency
   group serializes the two jobs. `-asset` and `-url` name a channel's asset
   for one run (the rolling asset has a fixed name), `-prune` forgets the
-  builds no channel points at.
+  build the run's channel leaves, unless another channel still points at
+  it. It used to forget every release no channel pointed at, which took a
+  stable channel's history with every rolling build; now each channel
+  prunes only what it published.
 - *Consent.* The same layers as the Go side, in Android's terms:
   `assets/amarit.json` is the stamp (the build copies the repository file
   in; the library reads nothing it was not given), options in code lay

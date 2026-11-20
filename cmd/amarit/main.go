@@ -129,7 +129,8 @@ keep it current (release side):
                  [-channel C] [-out FILE] [-expires D]           merged into FILE when it already exists
                  [-version-code N]                               the APK versionCode; required for the android target
                  [-asset PATTERN] [-url PATTERN] [-prune]        this run's patterns over release.asset and release.url;
-                                                                 -prune drops releases no channel points at
+                                                                 -prune drops the release the channel pointed at until
+                                                                 now, unless another channel still points at it
   amarit next-version [-pre dev] X                               the name of a rolling build after release X:
                                                                  0.3.9-dev.<UTC minute> after 0.3.8, which semver orders
   amarit version-code X                                          the APK versionCode of X, its pre-release part dropped:
@@ -196,7 +197,7 @@ func release(args []string) error {
 	versionCode := fs.Int("version-code", 0, "the APK versionCode (android target)")
 	assetPattern := fs.String("asset", "", "asset name pattern for this run, over release.asset")
 	urlFlag := fs.String("url", "", "download URL pattern for this run, over release.url")
-	prune := fs.Bool("prune", false, "drop releases no channel points at")
+	prune := fs.Bool("prune", false, "drop the release this channel pointed at until now, unless another channel still does")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -274,13 +275,13 @@ func release(args []string) error {
 		fmt.Fprintf(os.Stderr, "  %-14s %s  %d bytes  %s\n", target, name, size, sum[:12])
 	}
 	m.Releases[v] = amarit.Release{Assets: assets}
+	previous := m.Channels[*channel]
 	m.Channels[*channel] = v
-	if *prune {
-		for version := range m.Releases {
-			if !slices.Contains(slices.Collect(maps.Values(m.Channels)), version) {
-				delete(m.Releases, version)
-			}
-		}
+	if *prune && previous != "" && previous != v && !slices.Contains(slices.Collect(maps.Values(m.Channels)), previous) {
+		// Only the build this channel leaves: another channel's old
+		// releases are that channel's business.
+		delete(m.Releases, previous)
+		fmt.Fprintf(os.Stderr, "  pruned %s\n", previous)
 	}
 
 	data, err := json.MarshalIndent(m, "", "  ")

@@ -217,6 +217,10 @@ section 3). On GitHub the manifest lives on the rolling pre-release
 skips pre-releases. One signing key for every channel, or the platform
 refuses the update.
 
+`-prune` drops the release the run's channel pointed at until now, unless
+another channel still points at it, so each rolling build replaces the one
+before and the stable releases stay.
+
 ## Channels
 
 A manifest carries several channels, `"channels": {"stable": "0.3.8", "dev":

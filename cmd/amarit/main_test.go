@@ -1,9 +1,11 @@
 package main
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -73,7 +75,8 @@ func TestReleaseAndroid(t *testing.T) {
 	}
 	args := []string{"-config", cfg, "-version", "0.2.1+gabc1234", "-version-code", "3", "-channel", "latest",
 		"-asset", "app-latest.apk", "-url", "https://h/releases/download/latest/{asset}", "-dist", dist, "-out", out}
-	if err := release(args); err != nil {
+	// The channel's first build has nothing to prune.
+	if err := release(append(args, "-prune")); err != nil {
 		t.Fatal(err)
 	}
 	raw, _ := os.ReadFile(out)
@@ -90,7 +93,12 @@ func TestReleaseAndroid(t *testing.T) {
 		t.Fatalf("latest/android = %s %+v %v", v, a, ok)
 	}
 
-	// A second rolling build with -prune: the old one goes, stable stays.
+	// A second rolling build with -prune: the one it replaces goes. An old
+	// stable release no channel points at any more is stable's to keep.
+	os.WriteFile(filepath.Join(dist, "app-v0.2.2.apk"), []byte("stable2"), 0o644)
+	if err := release([]string{"-config", cfg, "-version", "v0.2.2", "-version-code", "4", "-dist", dist, "-out", out}); err != nil {
+		t.Fatal(err)
+	}
 	args[3] = "0.2.1+gdef5678"
 	if err := release(append(args, "-prune")); err != nil {
 		t.Fatal(err)
@@ -98,9 +106,26 @@ func TestReleaseAndroid(t *testing.T) {
 	raw, _ = os.ReadFile(out)
 	m, _ = amarit.ParseManifest(raw)
 	if _, ok := m.Releases["0.2.1+gabc1234"]; ok {
-		t.Fatal("-prune must drop a release no channel points at")
+		t.Fatal("-prune must drop the release the channel left")
 	}
-	if _, ok := m.Releases["0.2.1"]; !ok || m.Channels["latest"] != "0.2.1+gdef5678" {
-		t.Fatalf("after prune: %+v", m.Channels)
+	if _, ok := m.Releases["0.2.1"]; !ok || m.Channels["latest"] != "0.2.1+gdef5678" || m.Channels["stable"] != "0.2.2" {
+		t.Fatalf("after prune: %+v %v", m.Channels, slices.Collect(maps.Keys(m.Releases)))
+	}
+
+	// Pointing the channel at a version another channel holds drops nothing of it.
+	if err := release([]string{"-config", cfg, "-version", "v0.2.2", "-version-code", "4", "-channel", "latest", "-dist", dist, "-out", out, "-prune"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := release([]string{"-config", cfg, "-version", "0.2.3-dev.1", "-version-code", "5", "-channel", "latest",
+		"-asset", "app-latest.apk", "-dist", dist, "-out", out, "-prune"}); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ = os.ReadFile(out)
+	m, _ = amarit.ParseManifest(raw)
+	if _, ok := m.Releases["0.2.2"]; !ok {
+		t.Fatal("-prune on latest must keep the release stable points at")
+	}
+	if _, ok := m.Releases["0.2.1"]; !ok {
+		t.Fatal("the old stable release must stay")
 	}
 }
