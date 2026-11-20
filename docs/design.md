@@ -507,6 +507,51 @@ gain over a daemon that already runs as root); a sudoers rule for `amarit`
 and a policy language to maintain). Until (B) exists, (C) is the
 documented path.
 
+## Flatpak source for appupdate (proposal, not built)
+
+Project B's Linux app is a Flatpak (its `docs/research/linux.md`, branch
+`linux`), and a Flatpak updates through Flatpak's update portal, not a
+manifest: the OSTree repository is signed, Flatpak downloads only what
+changed, and `/app` is the deployment the app started from, so the old
+image cannot start the new one. The shell should still see appupdate's
+State and send its commands, so a Linux build needs no updater code of its
+own. Agreed with Project B's platforms and Linux sessions on 2026-11-20;
+built when its Linux app reaches the update step and a real repository can
+raise `UpdateAvailable`, which nothing has tested yet.
+
+- **A source seam in appupdate.** Today's source is the manifest and the
+  verified download; a `flatpak` source is the portal. The table of phases
+  and commands stays one table, with what differs said beside it.
+- **`github.com/sudiptadeb/amarit/flatpak`, a module of its own**, on
+  `godbus/dbus/v5`, so amarit's core stays standard library only. Tagged
+  `flatpak/vX.Y.Z`.
+
+| The portal says | appupdate shows |
+|---|---|
+| `UpdateAvailable`, the remote commit newer than the running one | with automatic updates on, `Update()` starts at once: `downloading`, `done` of `total` from its `Progress` signal (a percentage, so `total` is 100); off, it waits for Check |
+| the local commit is newer than the running one: GNOME Software or `flatpak update` updated the app while it ran | `ready` at once, nothing to download |
+| `Progress` ends | `ready` |
+| `Update()` refused: the release asks for new permissions | `failed`, kind `needs-user`, not retryable: the person updates in the software centre |
+| `Update()` failed otherwise | `failed`, kind `network`, retryable |
+
+- **Check** cannot ask the remote: the monitor polls on its own timer. It
+  starts the update the monitor already heard of, or shows `current`.
+- **Relaunch** is the portal's `Spawn` with `FLATPAK_SPAWN_FLAGS_LATEST_VERSION`
+  and the same arguments, then the app quits. The new copy waits for the
+  app's single-instance socket, not for a pid, since the pids live in
+  different namespaces. Single instance stays the app's.
+- **Channels** are Flatpak branches (Sudipta's call, pending), which the
+  portal cannot switch: `SetChannel` returns an unsupported error, and the
+  app opens the other branch's `.flatpakref` for the software centre.
+- **Rollback** is Flatpak's (`flatpak update --commit`), not amarit's.
+- **The presenter** is the Notification portal, not
+  `org.freedesktop.Notifications`, since the app is sandboxed: a
+  notification with Relaunch when ready, its `ActionInvoked` sending
+  Relaunch. A Linux desktop has no Dock progress to draw on.
+- **Publishing** stays Project B's: `flatpak-builder`, `ostree` and the GPG
+  signature run in its release tooling, and GitHub Pages serves the
+  repository. amarit publishes nothing for Flatpak.
+
 ## Consumers, in order
 
 1. A stateless tunnel agent on a canary channel.
