@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.8.0
+
+Release channels, as Project B built them by hand on top of amarit.
+
+- **`amarit next-version [-pre dev] 0.3.8`** prints `0.3.9-dev.<UTC minute>`:
+  the name of a rolling build, which semver orders after 0.3.8, after the
+  rolling builds before it, and before 0.3.9. `0.3.8+g<sha>` could not do
+  that on the desktop, where build metadata does not order.
+- **`amarit version-code 0.3.9-dev.202611201415`** prints `3009`, an APK's
+  `versionCode` from its version without the pre-release part, so the
+  rolling builds of 0.3.9 and the release 0.3.9 share one code.
+- **Android: an equal `versionCode` with an older name is not an update.**
+  A phone on 0.3.9 that picks the dev channel is not taken back to a dev
+  build before it. Long numeric pre-release parts, such as the minute, now
+  order correctly.
+- **`Client.Channel`, `SetChannel`, `AutoUpdate`, `SetAutoUpdate`.** The
+  person's choices live in `settings.json` in the client's state directory,
+  shared by every copy using it; `Check` reads the channel each time.
+- **`amarit publish -github owner/repo -tag channels ...`**: `amarit release`
+  against a GitHub release with a fixed tag. It creates the pre-release if
+  missing, merges into its manifest (else the latest release's), uploads the
+  version's assets on the tag, the files named and then the manifest, and
+  deletes the files of the release `-prune` dropped.
+- **`-prune` drops only the release the run's channel leaves**, unless
+  another channel still points at it. It used to drop every release no
+  channel pointed at, old stable releases included.
+- **docs: moving the manifest's address.** Publish to both addresses until
+  the copies on the old one have updated.
+- **npm package.** `npm install -g amarit` or `npx amarit` downloads the
+  pinned release to `~/.local/bin`, checked by sha256, published from
+  GitHub Actions on each release.
+
 ## v0.7.1
 
 - **`Client.Unreject()`** forgets the version a `Reject` took out, so the next

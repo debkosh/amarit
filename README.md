@@ -189,7 +189,9 @@ What the developer quick start sets up, in more depth:
   `amarit.Handoff`.
 - **Channels and rollouts.** The manifest supports `stable` and `canary`
   channels, staged rollouts, and a `min_version` floor that also works as a
-  kill switch.
+  kill switch. `amarit next-version` names rolling builds so semver orders
+  them, `amarit publish` keeps every channel's manifest on one GitHub
+  release, and a program lets its users pick the channel at runtime.
 - **No release host needed.** For services built on the machine they run
   on, point `releases` at a local directory.
 - **Android too.** A Kotlin library reads the same manifest and hands the
