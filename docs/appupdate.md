@@ -195,7 +195,7 @@ What differs from the manifest:
 | Relaunch | the portal's `Spawn` with the latest-version flag, for each copy with `Copies`, then `Quit`; the new copy starts at once and waits for the app's own single-instance lock. It runs with the running copy's sandbox |
 | Channels | none: `SetChannel` is `appupdate.ErrUnsupported` |
 | Rollback | Flatpak's (`flatpak update --commit`) |
-| The ready notification | the Notification portal, which a sandboxed app must use; its Relaunch button sends Relaunch. No Dock progress on Linux |
+| The ready notification | the Notification portal, which a sandboxed app must use; its Relaunch button sends Relaunch. GNOME routes the button through the app's desktop file, so a Flatpak without one shows "Unknown App" and its button does nothing. No Dock progress on Linux |
 
 `flatpak/examples/demo` is a Flatpak that updates itself this way, with
 its README's steps for a local repository. For a quick test, run the
