@@ -49,6 +49,16 @@ const (
 	Busy          Kind = "busy"         // another copy's download is still stopping
 	InstallFailed Kind = "install"      // putting the release in place failed
 	Development   Kind = "development"  // a build with no version, which never updates
+	NeedsUser     Kind = "needs-user"   // the update must be made outside the app, such as in the software centre
+)
+
+var (
+	// ErrNeedsUser is an update the app can't make: a Flatpak's that asks
+	// for new permissions, which the person grants in the software centre.
+	ErrNeedsUser = errors.New("the update needs the person, outside the app")
+	// ErrUnsupported is a command the source has no way to do, such as
+	// SetChannel on a Flatpak.
+	ErrUnsupported = errors.New("not supported by this source")
 )
 
 // Retryable says whether Retry is taken after a failure of this kind.
@@ -89,10 +99,39 @@ type Installer interface {
 	Install(staged string) error
 }
 
+// Source is where releases come from when it is not amarit's manifest:
+// a Flatpak's update portal, in package amarit/flatpak. With a Source the
+// Client keeps the settings and the lock, and the Installer is unused.
+type Source interface {
+	// Look says what the source knows of a release newer than the running
+	// one. It need not ask a server: a Flatpak's monitor polls on its own.
+	Look(ctx context.Context) (Found, error)
+	// Fetch makes f ready, calling progress as it goes. An update the app
+	// can't make wraps ErrNeedsUser.
+	Fetch(ctx context.Context, f Found, progress func(done, total int64)) error
+	// Install starts the ready release in place of the app, and ends it.
+	Install() error
+	// Changed is sent on when the source learns something; a round follows.
+	// Nil for a source that never does.
+	Changed() <-chan struct{}
+}
+
+// Found is what a Source knows of a release newer than the running one.
+// An empty ID is nothing newer.
+type Found struct {
+	ID      string // tells the release apart, such as a commit
+	Version string // its version, when the source knows one
+	Size    int64
+	Ready   bool // already installed beside the running one, as after an update made outside the app
+}
+
 // Config is what the updater needs.
 type Config struct {
 	Client    *amarit.Client
 	Installer Installer
+	// Source, when set, is where releases come from instead of the
+	// Client's manifest; Installer is then unused.
+	Source Source
 	// Dir is where downloads go, in Dir/download; the client's state
 	// directory does.
 	Dir string
@@ -131,6 +170,7 @@ type Updater struct {
 	staged        string // the release Relaunch installs, and its version
 	stagedVersion string
 	declined      string // a release the person cancelled: automatic checks leave it alone
+	fetching      string // the release downloading or verifying, for Cancel to decline
 	busy          bool   // an Install is running
 	work          context.Context
 	abort         context.CancelCauseFunc
@@ -179,7 +219,7 @@ func (u *Updater) OnChange(f func(State)) { u.events.subscribe(f) }
 // Start begins a round every Interval: each offers a release another copy
 // staged and, with automatic updates on, checks.
 func (u *Updater) Start() {
-	if u.cfg.Client.Version() == "" {
+	if u.development() {
 		u.cfg.Logf("appupdate: a development build doesn't update")
 		return
 	}
@@ -218,12 +258,17 @@ func (u *Updater) Close() {
 
 func (u *Updater) loop(stop chan struct{}) {
 	wait := u.cfg.FirstCheck
+	var changed <-chan struct{}
+	if u.cfg.Source != nil {
+		changed = u.cfg.Source.Changed()
+	}
 	for {
 		select {
 		case <-stop:
 			return
 		case <-time.After(wait):
 		case <-u.wake:
+		case <-changed:
 		}
 		u.round()
 		wait = u.cfg.Interval
@@ -319,8 +364,8 @@ func (u *Updater) Cancel() {
 		u.mu.Unlock()
 		return
 	}
-	if s.Version != "" {
-		u.declined = s.Version
+	if u.fetching != "" {
+		u.declined = u.fetching
 	}
 	if u.abort != nil {
 		u.abort(errCancelled)
@@ -350,11 +395,19 @@ func (u *Updater) Relaunch() {
 			u.busy = false
 			u.mu.Unlock()
 		}()
-		if err := u.cfg.Client.Installing(s.Version); err != nil {
-			u.cfg.Logf("appupdate: %v", err)
+		var err error
+		if u.cfg.Source != nil {
+			// The source keeps its own previous release: a Flatpak's rollback is Flatpak's.
+			u.cfg.Logf("appupdate: relaunching into %s", staged)
+			err = u.cfg.Source.Install()
+		} else {
+			if err := u.cfg.Client.Installing(s.Version); err != nil {
+				u.cfg.Logf("appupdate: %v", err)
+			}
+			u.cfg.Logf("appupdate: installing %s", s.Version)
+			err = u.cfg.Installer.Install(staged)
 		}
-		u.cfg.Logf("appupdate: installing %s", s.Version)
-		if err := u.cfg.Installer.Install(staged); err != nil {
+		if err != nil {
 			u.cfg.Logf("appupdate: install %s: %v", s.Version, err)
 			u.mu.Lock()
 			u.staged, u.stagedVersion = "", ""
@@ -367,6 +420,9 @@ func (u *Updater) Relaunch() {
 // SetChannel picks the channel for every copy sharing the state, and checks
 // it at once. A download of the other channel's release stops.
 func (u *Updater) SetChannel(name string) error {
+	if u.cfg.Source != nil {
+		return ErrUnsupported
+	}
 	if name == u.cfg.Client.Channel() {
 		return nil
 	}
@@ -395,6 +451,13 @@ func (u *Updater) SetAutoUpdate(on bool) error {
 	return nil
 }
 
+// development says this is a development build: a Client with no version
+// and the manifest to compare it against. A Source names its own releases,
+// so a Flatpak's Client needs no version.
+func (u *Updater) development() bool {
+	return u.cfg.Source == nil && u.cfg.Client.Version() == ""
+}
+
 // takes says whether the phase now is one of phases.
 func (u *Updater) takes(phases ...Phase) bool {
 	p := u.State().Phase
@@ -410,7 +473,7 @@ func (u *Updater) takes(phases ...Phase) bool {
 // why: it waits for another copy's, tries a refused or cancelled release
 // again, and says how it went.
 func (u *Updater) asked(why error) {
-	if u.cfg.Client.Version() == "" {
+	if u.development() {
 		u.fail(nil, "", Development, amarit.ErrDevelopment)
 		return
 	}
@@ -449,6 +512,9 @@ func (u *Updater) readSettings() { u.set(func(st *State) {}) }
 // readStaged offers a release another copy staged, once it is newer than
 // this one.
 func (u *Updater) readStaged(ctx context.Context) {
+	if u.cfg.Source != nil {
+		return // Look says what is in place
+	}
 	staged, v := u.cfg.Installer.Staged()
 	if staged == "" || !u.newer(v) {
 		return
@@ -472,6 +538,10 @@ func (u *Updater) newer(v string) bool {
 // names a newer release. The caller holds the lock. An automatic check only
 // logs a manifest it couldn't read, and leaves a cancelled release alone.
 func (u *Updater) check(ctx context.Context, asked bool) {
+	if u.cfg.Source != nil {
+		u.checkSource(ctx, asked)
+		return
+	}
 	if err := u.cfg.Installer.Usable(); err != nil {
 		u.fail(ctx, "", kindOf(err, Unchecked), err)
 		return
@@ -522,11 +592,12 @@ func (u *Updater) check(ctx context.Context, asked bool) {
 func (u *Updater) fetch(ctx context.Context, d *amarit.Decision) {
 	if !u.setFor(ctx, func(st *State) {
 		// A new download replaces what is staged.
-		u.staged, u.stagedVersion = "", ""
+		u.staged, u.stagedVersion, u.fetching = "", "", d.Version
 		*st = State{Phase: Downloading, Version: d.Version, Total: d.Asset.Size}
 	}) {
 		return
 	}
+	defer u.doneFetching(d.Version)
 	dir := filepath.Join(u.cfg.Dir, "download")
 	os.RemoveAll(dir)
 	defer os.RemoveAll(dir)
@@ -570,6 +641,89 @@ func (u *Updater) fetch(ctx context.Context, d *amarit.Decision) {
 	u.setFor(ctx, func(st *State) {
 		u.staged, u.stagedVersion = staged, d.Version
 		*st = State{Phase: Ready, Version: d.Version}
+	})
+}
+
+func (u *Updater) doneFetching(id string) {
+	u.mu.Lock()
+	if u.fetching == id {
+		u.fetching = ""
+	}
+	u.mu.Unlock()
+}
+
+// checkSource is check for a Source: what it knows, and the update when
+// there is one to make. Look asks no server, so a check a person asks for
+// that finds nothing shows current.
+func (u *Updater) checkSource(ctx context.Context, asked bool) {
+	f, err := u.cfg.Source.Look(ctx)
+	if ctx.Err() != nil {
+		return
+	}
+	if err != nil {
+		u.cfg.Logf("appupdate: look: %v", err)
+		if asked {
+			u.fail(ctx, "", Offline, err)
+		}
+		return
+	}
+	u.mu.Lock()
+	staged, declined := u.staged, u.declined
+	u.mu.Unlock()
+	switch {
+	case f.ID == "":
+		u.setFor(ctx, func(st *State) {
+			switch st.Phase {
+			case Checking:
+				*st = State{Phase: UpToDate}
+			case Failed:
+				*st = State{}
+			}
+		})
+	case f.Ready || staged == f.ID:
+		u.setFor(ctx, func(st *State) {
+			u.staged, u.stagedVersion = f.ID, f.Version
+			*st = State{Phase: Ready, Version: f.Version}
+		})
+	case !asked && declined == f.ID:
+		u.cfg.Logf("appupdate: %s was cancelled; waiting for a check a person asks for", f.ID)
+	default:
+		u.fetchSource(ctx, f)
+	}
+}
+
+func (u *Updater) fetchSource(ctx context.Context, f Found) {
+	if !u.setFor(ctx, func(st *State) {
+		u.staged, u.stagedVersion, u.fetching = "", "", f.ID
+		*st = State{Phase: Downloading, Version: f.Version, Total: f.Size}
+	}) {
+		return
+	}
+	defer u.doneFetching(f.ID)
+	u.cfg.Logf("appupdate: updating to %s", f.ID)
+	err := u.cfg.Source.Fetch(ctx, f, func(done, total int64) {
+		u.setFor(ctx, func(st *State) {
+			if st.Phase == Downloading {
+				st.Done, st.Total = done, total
+			}
+		})
+	})
+	if ctx.Err() != nil {
+		return
+	}
+	if err != nil {
+		u.cfg.Logf("appupdate: %s: %v", f.ID, err)
+		k := Network
+		if errors.Is(err, ErrNeedsUser) {
+			k = NeedsUser
+		}
+		u.fail(ctx, f.Version, k, err)
+		return
+	}
+	u.cfg.Logf("appupdate: %s is installed; ready to relaunch", f.ID)
+	u.setFor(ctx, func(st *State) {
+		u.staged, u.stagedVersion = f.ID, f.Version
+		*st = State{Phase: Ready, Version: f.Version}
 	})
 }
 
