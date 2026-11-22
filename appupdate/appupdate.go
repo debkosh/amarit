@@ -50,6 +50,10 @@ const (
 	InstallFailed Kind = "install"      // putting the release in place failed
 	Development   Kind = "development"  // a build with no version, which never updates
 	NeedsUser     Kind = "needs-user"   // the update must be made outside the app, such as in the software centre
+	// NeedsPermission is an update the person must allow, which the system
+	// asks only while the app is in front: GNOME's first Flatpak
+	// self-update. Retry, or the next round, with the app in front asks.
+	NeedsPermission Kind = "needs-permission"
 )
 
 var (
@@ -59,12 +63,15 @@ var (
 	// ErrUnsupported is a command the source has no way to do, such as
 	// SetChannel on a Flatpak.
 	ErrUnsupported = errors.New("not supported by this source")
+	// ErrNeedsPermission is an update the system would ask the person to
+	// allow, but only while the app is in front.
+	ErrNeedsPermission = errors.New("the update needs the person's permission, asked while the app is in front")
 )
 
 // Retryable says whether Retry is taken after a failure of this kind.
 func (k Kind) Retryable() bool {
 	switch k {
-	case Offline, Network, Stalled, Damaged, Unchecked, InstallFailed:
+	case Offline, Network, Stalled, Damaged, Unchecked, InstallFailed, NeedsPermission:
 		return true
 	}
 	return false
@@ -714,8 +721,11 @@ func (u *Updater) fetchSource(ctx context.Context, f Found) {
 	if err != nil {
 		u.cfg.Logf("appupdate: %s: %v", f.ID, err)
 		k := Network
-		if errors.Is(err, ErrNeedsUser) {
+		switch {
+		case errors.Is(err, ErrNeedsUser):
 			k = NeedsUser
+		case errors.Is(err, ErrNeedsPermission):
+			k = NeedsPermission
 		}
 		u.fail(ctx, f.Version, k, err)
 		return

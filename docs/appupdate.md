@@ -68,6 +68,7 @@ the next round tries again.
 | `busy` | another copy's download is still stopping | no; Check again |
 | `development` | a build with no version, which never updates | no |
 | `needs-user` | the update must be made outside the app: a Flatpak's that asks for new permissions, or one the person turned down | no |
+| `needs-permission` | the system asks the person to allow the update, but only while the app is in front: GNOME's first Flatpak self-update | yes; the next round also tries |
 
 Behaviour behind the table:
 
@@ -190,7 +191,7 @@ What differs from the manifest:
 | Downloading | the portal's `Update`, `done` of `total` from its progress |
 | Updated outside the app (GNOME Software, `flatpak update`) | `ready` at once |
 | A release that asks for new permissions | `failed`, `needs-user`: the person updates in the software centre |
-| The first update | Flatpak asks the person once, "Allow … to update itself?"; `downloading` at 0 while the dialog waits; a refusal is `needs-user` |
+| The first update | Flatpak asks the person once, "Allow … to update itself?", and GNOME shows that dialog only while the app is in front: otherwise `failed`, `needs-permission`, and Retry or the next round with the app in front asks. `downloading` at 0 while the dialog waits; the person turning it down is `needs-user`. With no app in front at all, GNOME 46's dialog fails without answering, and the update waits until Cancel |
 | Relaunch | the portal's `Spawn` with the latest-version flag, for each copy with `Copies`, then `Quit`; the new copy starts at once and waits for the app's own single-instance lock. It runs with the running copy's sandbox |
 | Channels | none: `SetChannel` is `appupdate.ErrUnsupported` |
 | Rollback | Flatpak's (`flatpak update --commit`) |

@@ -158,3 +158,19 @@ func TestSourceCancelAndChannel(t *testing.T) {
 		t.Fatalf("SetChannel: %v", err)
 	}
 }
+
+// An update the system asks to allow only while the app is in front is
+// retryable, unlike one the person must make elsewhere.
+func TestSourceNeedsPermissionIsRetryable(t *testing.T) {
+	src := &source{found: Found{ID: "c2"}, fetchErr: fmt.Errorf("not in front: %w", ErrNeedsPermission)}
+	u := sourceRig(t, src)
+	u.Check()
+	if s := waitState(t, u, "failed", phase(Failed)); s.Kind != NeedsPermission || !s.Kind.Retryable() {
+		t.Fatalf("needs permission: %+v", s)
+	}
+	src.mu.Lock()
+	src.fetchErr = nil
+	src.mu.Unlock()
+	u.Retry()
+	waitState(t, u, "ready", phase(Ready))
+}
