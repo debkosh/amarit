@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.1 and flatpak/v0.11.2
+
+- **appupdate kind `needs-permission`**, retryable: an update the person must
+  allow, which the system asks only while the app is in front.
+- **flatpak: GNOME's "Only the focused app is allowed to show a system access
+  dialog" is `needs-permission`, not `needs-user`.** The first self-update of
+  a Flatpak that isn't in front was told to go to the software centre, when
+  Retry, or the next round, with the app in front asks the person. Found on
+  Ubuntu 24.04 (GNOME 46). The person turning the dialog down stays
+  `needs-user`.
+
 ## flatpak/v0.11.1
 
 - **`flatpak.Options.VersionOf(ctx, commit)`** names the version a commit

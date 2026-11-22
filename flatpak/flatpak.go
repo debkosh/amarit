@@ -23,8 +23,10 @@
 //     permissions, which only the software centre installs, gets them at the
 //     next start the person makes.
 //   - The first update asks the person, once, through the Access portal
-//     ("Allow … to update itself?"); appupdate shows downloading at 0 while
-//     the dialog waits, and a refusal fails as appupdate.NeedsUser.
+//     ("Allow … to update itself?"), and GNOME asks only while the app is in
+//     front: otherwise it fails as appupdate.NeedsPermission, retried by the
+//     next round or Retry. appupdate shows downloading at 0 while the dialog
+//     waits; the person turning it down fails as appupdate.NeedsUser.
 //
 // It is a module of its own, on github.com/godbus/dbus/v5, so amarit's core
 // stays standard library only.
@@ -35,6 +37,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -238,15 +241,21 @@ func (s *Source) Fetch(ctx context.Context, f appupdate.Found, report func(done,
 	}
 }
 
-// refusal words a failed update. The portal refuses with NotSupported an
-// update that asks for new permissions ("Self update not supported, new
-// version requires new permissions") or a system with no Access portal,
-// and with AccessDenied one the person turned down: each is made, if at
-// all, in the software centre.
+// refusal words a failed update:
+//   - NotSupported: the update asks for new permissions ("Self update not
+//     supported, new version requires new permissions"), or the system has no
+//     Access portal. Made, if at all, in the software centre: needs-user.
+//   - AccessDenied "Only the focused app is allowed to show a system access
+//     dialog": GNOME asks the person to allow the first self-update only while
+//     the app is in front. needs-permission, which Retry, or the next round,
+//     with the app in front asks again.
+//   - Any other AccessDenied: the person turned it down, needs-user.
 func refusal(name, message string) error {
 	err := fmt.Errorf("flatpak: %s: %s", name, message)
-	switch name {
-	case "org.freedesktop.DBus.Error.NotSupported", "org.freedesktop.DBus.Error.AccessDenied":
+	switch {
+	case name == "org.freedesktop.DBus.Error.AccessDenied" && strings.Contains(message, "focused app"):
+		return fmt.Errorf("%w: %w", appupdate.ErrNeedsPermission, err)
+	case name == "org.freedesktop.DBus.Error.NotSupported", name == "org.freedesktop.DBus.Error.AccessDenied":
 		return fmt.Errorf("%w: %w", appupdate.ErrNeedsUser, err)
 	}
 	return err

@@ -39,6 +39,11 @@ func TestRefusalForNewPermissionsNeedsTheUser(t *testing.T) {
 	if err := refusal("org.freedesktop.DBus.Error.AccessDenied", "Application update not allowed"); !errors.Is(err, appupdate.ErrNeedsUser) {
 		t.Fatalf("turned down: %v", err)
 	}
+	// As GNOME 46 said it on Ubuntu 24.04, for an app not in front.
+	err := refusal("org.freedesktop.DBus.Error.AccessDenied", "GDBus.Error:org.freedesktop.DBus.Error.AccessDenied: Only the focused app is allowed to show a system access dialog")
+	if !errors.Is(err, appupdate.ErrNeedsPermission) || errors.Is(err, appupdate.ErrNeedsUser) {
+		t.Fatalf("not in front: %v", err)
+	}
 }
 
 // VersionOf names the commit Look found, the remote one to fetch or the

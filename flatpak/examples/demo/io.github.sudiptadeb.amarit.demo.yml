@@ -14,6 +14,16 @@ modules:
       strip: false
     build-commands:
       - install -D amarit-demo /app/bin/amarit-demo
+      - install -D io.github.sudiptadeb.amarit.demo.desktop /app/share/applications/io.github.sudiptadeb.amarit.demo.desktop
     sources:
       - type: file
         path: amarit-demo
+      # GNOME names a notification's app, and routes its buttons, by this.
+      - type: inline
+        dest-filename: io.github.sudiptadeb.amarit.demo.desktop
+        contents: |
+          [Desktop Entry]
+          Type=Application
+          Name=amarit demo
+          Exec=amarit-demo
+          Icon=application-x-executable
