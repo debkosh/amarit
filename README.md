@@ -203,7 +203,8 @@ What the developer quick start sets up, in more depth:
   app's update button: state and progress out, Check, Cancel, Retry and
   Relaunch in, no interface of its own. `amarit/macapp` installs a macOS
   bundle: signature checked in process, swapped in atomically, rolled back
-  if it won't start. See [docs/appupdate.md](docs/appupdate.md).
+  if it won't start. `amarit/flatpak` does the same for a Flatpak, through
+  Flatpak's update portal. See [docs/appupdate.md](docs/appupdate.md).
 
 The full guide is [docs/updates.md](docs/updates.md), the manifest format
 is [docs/spec.md](docs/spec.md), and the reasoning behind the design is

@@ -67,6 +67,7 @@ the next round tries again.
 | `not-writable` | the app can't be replaced where it is | no |
 | `busy` | another copy's download is still stopping | no; Check again |
 | `development` | a build with no version, which never updates | no |
+| `needs-user` | the update must be made outside the app: a Flatpak's that asks for new permissions, or one the person turned down | no |
 
 Behaviour behind the table:
 
@@ -162,6 +163,43 @@ under launchd.
 
 macapp needs cgo, for the Security framework and `renamex_np`. These are
 the system's own frameworks, not a dependency.
+
+## A Flatpak: `amarit/flatpak`
+
+A Flatpak updates through Flatpak's update portal, not amarit's manifest:
+the repository is signed, Flatpak downloads only what changed, and `/app`
+stays the deployment the app started from. `appupdate.Config.Source` takes
+`github.com/sudiptadeb/amarit/flatpak`, a module of its own on
+`godbus/dbus/v5`, and the shell sees the same State and sends the same
+commands.
+
+```go
+src, err := flatpak.New(flatpak.Options{Copies: copies, Quit: app.Quit})
+c, _ := amarit.NewClient(stateDir, "stable", amarit.ProjectFile(amaritJSON)) // the settings and the lock
+u := appupdate.New(appupdate.Config{Client: c, Source: src, Dir: stateDir})
+src.Present(u, flatpak.Words{})  // the ready notification with Relaunch
+u.Start()
+```
+
+What differs from the manifest:
+
+| | Flatpak |
+|---|---|
+| Finding an update | the portal's monitor polls the remote every 30 minutes and says when it heard of a newer commit; `Check` makes the update it heard of, or shows `current` |
+| `version` | empty: the portal names commits |
+| Downloading | the portal's `Update`, `done` of `total` from its progress |
+| Updated outside the app (GNOME Software, `flatpak update`) | `ready` at once |
+| A release that asks for new permissions | `failed`, `needs-user`: the person updates in the software centre |
+| The first update | Flatpak asks the person once, "Allow … to update itself?"; `downloading` at 0 while the dialog waits; a refusal is `needs-user` |
+| Relaunch | the portal's `Spawn` with the latest-version flag, for each copy with `Copies`, then `Quit`; the new copy starts at once and waits for the app's own single-instance lock. It runs with the running copy's sandbox |
+| Channels | none: `SetChannel` is `appupdate.ErrUnsupported` |
+| Rollback | Flatpak's (`flatpak update --commit`) |
+| The ready notification | the Notification portal, which a sandboxed app must use; its Relaunch button sends Relaunch. No Dock progress on Linux |
+
+`flatpak/examples/demo` is a Flatpak that updates itself this way, with
+its README's steps for a local repository. For a quick test, run the
+portal with a short poll: `/usr/libexec/flatpak-portal --replace
+--no-idle-exit --poll-timeout=15`.
 
 ## The system's own way of showing it
 

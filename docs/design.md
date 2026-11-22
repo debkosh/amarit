@@ -507,7 +507,7 @@ gain over a daemon that already runs as root); a sudoers rule for `amarit`
 and a policy language to maintain). Until (B) exists, (C) is the
 documented path.
 
-## Flatpak source for appupdate (proposal, not built)
+## Flatpak source for appupdate (built in v0.11.0; the guide is appupdate.md)
 
 Project B's Linux app is a Flatpak (its `docs/research/linux.md`, branch
 `linux`), and a Flatpak updates through Flatpak's update portal, not a
@@ -516,8 +516,10 @@ changed, and `/app` is the deployment the app started from, so the old
 image cannot start the new one. The shell should still see appupdate's
 State and send its commands, so a Linux build needs no updater code of its
 own. Agreed with Project B's platforms and Linux sessions on 2026-11-20;
-built when its Linux app reaches the update step and a real repository can
-raise `UpdateAvailable`, which nothing has tested yet.
+built in v0.11.0 and tried on Ubuntu 24.04 (Flatpak 1.14.6) against a real
+repository: an update with its progress and the Spawn into the new commit,
+the refusal of new permissions, an update made outside the app, and the
+notification reaching GNOME.
 
 - **A source seam in appupdate.** Today's source is the manifest and the
   verified download; a `flatpak` source is the portal. The table of phases

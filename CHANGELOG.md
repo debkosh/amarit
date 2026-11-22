@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.11.0
+
+Flatpak, for Project B's Linux app. Guide: docs/appupdate.md, "A Flatpak".
+
+- **`appupdate.Source`**: where releases come from when it is not amarit's
+  manifest. `Look`, `Fetch` with progress, `Install`, `Changed`. With a
+  Source the Client keeps only the settings and the lock, needs no version,
+  and `SetChannel` is `ErrUnsupported`. New kind `needs-user`, not retryable.
+- **`github.com/sudiptadeb/amarit/flatpak`**, a module of its own on
+  godbus, tagged `flatpak/v0.11.0`: the Flatpak portal's update monitor as a
+  Source, the relaunch through `Spawn` with the latest-version flag, and a
+  Notification-portal notification with Relaunch. Tried on Ubuntu 24.04
+  against a real repository: update and relaunch, the refusal of new
+  permissions, an update made outside the app, and the notification.
+- **`flatpak/examples/demo`**: a Flatpak that updates itself, with the
+  steps for a local repository.
+
 ## v0.10.4
 
 - **appupdate: Cancel right after Retry stops everything.** Retry's new
