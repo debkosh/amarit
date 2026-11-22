@@ -1,0 +1,19 @@
+app-id: io.github.sudiptadeb.amarit.demo
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+command: amarit-demo
+finish-args:
+  - --socket=wayland
+modules:
+  - name: amarit-demo
+    buildsystem: simple
+    # A Go binary carries no separate debug info to split off.
+    build-options:
+      no-debuginfo: true
+      strip: false
+    build-commands:
+      - install -D amarit-demo /app/bin/amarit-demo
+    sources:
+      - type: file
+        path: amarit-demo
