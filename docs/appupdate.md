@@ -186,7 +186,7 @@ What differs from the manifest:
 | | Flatpak |
 |---|---|
 | Finding an update | the portal's monitor polls the remote every 30 minutes and says when it heard of a newer commit; `Check` makes the update it heard of, or shows `current` |
-| `version` | empty: the portal names commits |
+| `version` | what `Options.VersionOf(ctx, commit)` says the commit is, else empty: the portal names commits. It runs on the updater's goroutine and may read the network |
 | Downloading | the portal's `Update`, `done` of `total` from its progress |
 | Updated outside the app (GNOME Software, `flatpak update`) | `ready` at once |
 | A release that asks for new permissions | `failed`, `needs-user`: the person updates in the software centre |

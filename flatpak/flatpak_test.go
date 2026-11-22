@@ -40,3 +40,21 @@ func TestRefusalForNewPermissionsNeedsTheUser(t *testing.T) {
 		t.Fatalf("turned down: %v", err)
 	}
 }
+
+// VersionOf names the commit Look found, the remote one to fetch or the
+// local one already deployed; "" leaves Version empty.
+func TestLookNamesTheVersion(t *testing.T) {
+	versions := map[string]string{"b": "0.4.1", "c": "0.4.2"}
+	s := &Source{opts: Options{VersionOf: func(ctx context.Context, commit string) string { return versions[commit] }}}
+	for heard, want := range map[[3]string]appupdate.Found{
+		{"a", "a", "c"}: {ID: "c", Version: "0.4.2"},
+		{"a", "b", "b"}: {ID: "b", Version: "0.4.1", Ready: true},
+		{"a", "a", "d"}: {ID: "d"},
+		{"a", "a", "a"}: {},
+	} {
+		s.heard = map[string]string{"running-commit": heard[0], "local-commit": heard[1], "remote-commit": heard[2]}
+		if got, _ := s.Look(context.Background()); got != want {
+			t.Errorf("heard %v: got %+v, want %+v", heard, got, want)
+		}
+	}
+}

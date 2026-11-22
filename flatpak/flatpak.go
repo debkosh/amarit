@@ -9,7 +9,8 @@
 //     says when it heard of a newer commit, local or remote. Check can't ask
 //     anyone: it makes the update the monitor heard of, or shows current, so
 //     an app knows of an update up to 30 minutes after it starts.
-//   - The portal names commits, not versions, so State.Version is empty.
+//   - The portal names commits, not versions: State.Version is what
+//     Options.VersionOf says the commit is, else empty.
 //   - An update that asks for new permissions is refused by the portal; it
 //     fails as appupdate.NeedsUser, and the person updates in the software
 //     centre.
@@ -72,6 +73,11 @@ type Options struct {
 	Args   []string
 	// Quit ends the app once the new release is starting.
 	Quit func()
+	// VersionOf, when set, names the version a commit is, for the shell's
+	// words and release notes: the portal names only commits. It runs on the
+	// updater's goroutine and may read the network; "" is unknown, and
+	// Version stays empty. ctx ends with the round, on Cancel or Close.
+	VersionOf func(ctx context.Context, commit string) string
 }
 
 // Source is the Flatpak portal's update monitor, as an appupdate.Source.
@@ -183,13 +189,19 @@ func (s *Source) Look(ctx context.Context) (appupdate.Found, error) {
 	h := s.heard
 	s.mu.Unlock()
 	running, local, remote := h["running-commit"], h["local-commit"], h["remote-commit"]
+	var f appupdate.Found
 	switch {
 	case remote != "" && remote != local && remote != running:
-		return appupdate.Found{ID: remote}, nil
+		f = appupdate.Found{ID: remote}
 	case local != "" && local != running:
-		return appupdate.Found{ID: local, Ready: true}, nil
+		f = appupdate.Found{ID: local, Ready: true}
+	default:
+		return f, nil
 	}
-	return appupdate.Found{}, nil
+	if s.opts.VersionOf != nil {
+		f.Version = s.opts.VersionOf(ctx, f.ID)
+	}
+	return f, nil
 }
 
 // Fetch makes the update through the portal, reporting its progress.

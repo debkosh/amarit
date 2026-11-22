@@ -1,5 +1,13 @@
 # Changelog
 
+## flatpak/v0.11.1
+
+- **`flatpak.Options.VersionOf(ctx, commit)`** names the version a commit
+  is, so `State.Version` carries it for the shell's words and release notes;
+  the portal names only commits. It runs on the updater's goroutine, may read
+  the network, and `""` leaves the version empty. Asked for by Project B,
+  which maps commits to versions in a file it publishes.
+
 ## v0.11.0
 
 Flatpak, for Project B's Linux app. Guide: docs/appupdate.md, "A Flatpak".
