@@ -111,3 +111,7 @@ func HandleNotificationResponse(category, action string) bool {
 func macappNotificationResponse(category, action *C.char) {
 	HandleNotificationResponse(C.GoString(category), C.GoString(action))
 }
+
+// removeNotification takes amarit's ready notification away, whether or not
+// Present posted one.
+func removeNotification() { C.macapp_notify_remove() }

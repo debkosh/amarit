@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.11.2
+
+- **macapp: Install takes the ready notification away.** A person who
+  relaunched from the app rather than from the notification was left with
+  "ready" in Notification Center after the update. The Flatpak source has
+  done this since flatpak/v0.11.0; the Mac's was missed then.
+
 ## v0.11.1 and flatpak/v0.11.2
 
 - **appupdate kind `needs-permission`**, retryable: an update the person must

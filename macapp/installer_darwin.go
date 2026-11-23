@@ -87,6 +87,8 @@ func (i *Installer) Install(staged string) error {
 	if err := Swap(staged, i.App, i.previous()); err != nil {
 		return err
 	}
+	// The release is in place: a ready notification would outlive it.
+	removeNotification()
 	path := filepath.Join(i.App, "Contents", "MacOS", exe.Executable)
 	if i.Copies != nil {
 		i.Copies.StartAfter(path, copies)
