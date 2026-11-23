@@ -6,6 +6,10 @@
   relaunched from the app rather than from the notification was left with
   "ready" in Notification Center after the update. The Flatpak source has
   done this since flatpak/v0.11.0; the Mac's was missed then.
+- **macapp: no notification calls outside a bundle.** UNUserNotificationCenter
+  throws in a process with no bundle identifier, so `Present`, and now
+  `Install`, aborted a test binary or a command-line program. They leave
+  notifications alone there.
 
 ## v0.11.1 and flatpak/v0.11.2
 

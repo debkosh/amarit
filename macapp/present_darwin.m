@@ -9,6 +9,13 @@
 static NSString* const kCategory = @"amarit.update";
 static NSString* const kRelaunch = @"amarit.relaunch";
 
+// UNUserNotificationCenter throws in a process with no bundle, such as a
+// test binary or a command-line program, so amarit leaves notifications to
+// processes that have a bundle identifier.
+static BOOL HasBundle(void) {
+  return NSBundle.mainBundle.bundleIdentifier.length > 0;
+}
+
 static void OnMain(dispatch_block_t block) {
   if (NSThread.isMainThread) {
     block();
@@ -83,6 +90,7 @@ void macapp_dock_clear(void) {
 @end
 
 void macapp_notify(const char* ctitle, const char* cbody, const char* cbutton) {
+  if (!HasBundle()) return;
   NSString* title = [NSString stringWithUTF8String:ctitle];
   NSString* body = [NSString stringWithUTF8String:cbody];
   NSString* button = [NSString stringWithUTF8String:cbutton];
@@ -125,6 +133,7 @@ void macapp_notify(const char* ctitle, const char* cbody, const char* cbutton) {
 }
 
 void macapp_notify_remove(void) {
+  if (!HasBundle()) return;
   OnMain(^{
     UNUserNotificationCenter* center = UNUserNotificationCenter.currentNotificationCenter;
     [center removeDeliveredNotificationsWithIdentifiers:@[ kCategory ]];
