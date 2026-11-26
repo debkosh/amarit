@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.12.0 and flatpak/v0.12.0
+
+- **Module path `github.com/debkosh/amarit`** (and `github.com/debkosh/amarit/flatpak`):
+  the repo moved to the debkosh organisation. Change the import path to upgrade;
+  v0.11.2 and older stay under `github.com/sudiptadeb/amarit`. No other change.
+- **amarit updates itself from `debkosh/amarit`'s releases**, and `amarit update`
+  counts programs built with either path as amarit's.
+
 ## v0.11.2
 
 - **macapp: Install takes the ready notification away.** A person who
