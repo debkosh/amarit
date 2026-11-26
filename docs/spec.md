@@ -35,7 +35,7 @@ so they belong on the same machine or a trusted network.
   "published": "2026-10-09T10:00:00Z",
   "expires": "2026-11-09T10:00:00Z",
   "min_version": "0.5.0",
-  "notes": "https://github.com/sudiptadeb/termulaa/releases",
+  "notes": "https://github.com/debkosh/termulaa/releases",
   "channels": { "stable": "0.5.2", "canary": "0.5.3" },
   "releases": {
     "0.5.3": {
@@ -175,7 +175,7 @@ manifest and carried by the binary so the program hardcodes nothing:
 ```json
 {
   "project": "termulaa",
-  "releases": "https://github.com/sudiptadeb/termulaa/releases/latest/download/releases.json",
+  "releases": "https://github.com/debkosh/termulaa/releases/latest/download/releases.json",
   "key": "RWQ…",
   "restart": "overlap",
   "interval": "5m",

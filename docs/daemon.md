@@ -86,7 +86,7 @@ name in use by a running job is refused.
 The daemon does keep *itself* current, using the library like any other
 program: it declares auto-update its default (amarit's own `amarit.json`
 says the same), so `amarit daemon` checks
-[amarit's releases](https://github.com/sudiptadeb/amarit/releases) hourly,
+[amarit's releases](https://github.com/debkosh/amarit/releases) hourly,
 verifies, swaps the binary and restarts in place. The pid does not change,
 launchd or systemd notice nothing, and the units stay its children and are
 adopted with their pids; a version that cannot come up three times is
@@ -150,7 +150,7 @@ detached in its own session: that survives the terminal, not a reboot.
 **Who the daemon runs as.** The installing user, in every form above.
 Nothing refuses a daemon started as root by hand today (`sudo amarit run`
 would create `/var/root/.amarit` and a detached root daemon); issue
-[#4](https://github.com/sudiptadeb/amarit/issues/4) adds that guard.
+[#4](https://github.com/debkosh/amarit/issues/4) adds that guard.
 
 **Who units run as.** The daemon's user. A unit has no user field. Each
 unit starts in its own session, so its pid is its process-group id and a
@@ -182,7 +182,7 @@ owner. Secrets belong in `env_file`, which the daemon reads at exec; `env`
 is stored in the unit JSON. Today the directories are 0755 and the unit,
 run, pid and log files 0644, so another local account that can traverse
 your home can read them; issue
-[#5](https://github.com/sudiptadeb/amarit/issues/5) tightens them to
+[#5](https://github.com/debkosh/amarit/issues/5) tightens them to
 0700/0600.
 
 **Other platforms.** On anything but macOS and Linux, `amarit install`

@@ -286,7 +286,7 @@ replaced by hand once; after that the channel carries it.
 
 ### The daemon's own configuration
 
-`go install github.com/sudiptadeb/amarit/cmd/amarit@latest` is the
+`go install github.com/debkosh/amarit/cmd/amarit@latest` is the
 documented install, and it cannot pass linker flags, so until v0.5.2 such a
 daemon had no project, no releases URL, and never updated. The library's
 answer for any project is to embed `amarit.json`; amarit itself cannot take
@@ -345,7 +345,7 @@ Decisions, and what was not taken:
   check between the two implementations. A separate repository would drift
   from the spec. JitPack builds the module from a tag or a commit
   (`jitpack.yml` points it at `android/`) as
-  `com.github.sudiptadeb:amarit`, its convention for a repository with one
+  `com.github.debkosh:amarit`, its convention for a repository with one
   published module; the AAR is also attached to each release. One version tag for both halves.
 - *Platform APIs only.* HttpsURLConnection, org.json, MessageDigest,
   PackageInstaller, JobScheduler, Notification. No AndroidX, no
@@ -524,7 +524,7 @@ notification reaching GNOME.
 - **A source seam in appupdate.** Today's source is the manifest and the
   verified download; a `flatpak` source is the portal. The table of phases
   and commands stays one table, with what differs said beside it.
-- **`github.com/sudiptadeb/amarit/flatpak`, a module of its own**, on
+- **`github.com/debkosh/amarit/flatpak`, a module of its own**, on
   `godbus/dbus/v5`, so amarit's core stays standard library only. Tagged
   `flatpak/vX.Y.Z`.
 

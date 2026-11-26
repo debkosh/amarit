@@ -15,11 +15,11 @@ so it knows where to look:
 ```json
 {
   "project": "termulaa",
-  "releases": "https://github.com/sudiptadeb/termulaa/releases/latest/download/releases.json",
+  "releases": "https://github.com/debkosh/termulaa/releases/latest/download/releases.json",
   "release": {
     "targets": ["darwin/arm64", "darwin/amd64", "linux/amd64", "linux/arm64"],
     "asset": "termulaa-{os}-{arch}-v{version}",
-    "url": "https://github.com/sudiptadeb/termulaa/releases/download/v{version}/{asset}"
+    "url": "https://github.com/debkosh/termulaa/releases/download/v{version}/{asset}"
   }
 }
 ```
@@ -28,7 +28,7 @@ The file reaches the binary one of two ways, the author's choice. Stamped
 at build, so the program needs nothing but the one call:
 
 ```go
-import "github.com/sudiptadeb/amarit"
+import "github.com/debkosh/amarit"
 
 func main() {
     amarit.Start() // reads the stamped amarit.json
@@ -187,7 +187,7 @@ Install. Platform APIs only, minSdk 26.
 
 ```kotlin
 // settings.gradle.kts: maven("https://jitpack.io") among the repositories
-// build.gradle.kts:    implementation("com.github.sudiptadeb:amarit:v0.6.0")
+// build.gradle.kts:    implementation("com.github.debkosh:amarit:v0.6.0")
 // AndroidManifest.xml: <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
 override fun onCreate(savedInstanceState: Bundle?) {
@@ -204,7 +204,7 @@ user's switch, `Amarit.current?.autoUpdate = false`, turns that off, and
 until the app's own button calls `checkNow(activity)`.
 
 CI publishes the APK and the manifest together. With the amarit CLI
-installed on the runner (`go install github.com/sudiptadeb/amarit/cmd/amarit@latest`):
+installed on the runner (`go install github.com/debkosh/amarit/cmd/amarit@latest`):
 
 ```sh
 amarit release -version 0.2.1 -version-code 3 -dist dist -out dist/releases.json

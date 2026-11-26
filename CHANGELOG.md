@@ -38,7 +38,7 @@ Flatpak, for Project B's Linux app. Guide: docs/appupdate.md, "A Flatpak".
   manifest. `Look`, `Fetch` with progress, `Install`, `Changed`. With a
   Source the Client keeps only the settings and the lock, needs no version,
   and `SetChannel` is `ErrUnsupported`. New kind `needs-user`, not retryable.
-- **`github.com/sudiptadeb/amarit/flatpak`**, a module of its own on
+- **`github.com/debkosh/amarit/flatpak`**, a module of its own on
   godbus, tagged `flatpak/v0.11.0`: the Flatpak portal's update monitor as a
   Source, the relaunch through `Spawn` with the latest-version flag, and a
   Notification-portal notification with Relaunch. Tried on Ubuntu 24.04
@@ -208,7 +208,7 @@ An Android app is the sixth consumer: the same manifest, read from Kotlin.
   PackageInstaller; the user taps Install. Platform APIs only, minSdk 26.
   A notification on its own channel and an in-app dialog are the default
   UI; `Updater` is the API for an app that wants its own. Served by JitPack
-  as `com.github.sudiptadeb:amarit`, the AAR attached to releases.
+  as `com.github.debkosh:amarit`, the AAR attached to releases.
 - **Spec: Android versions.** A higher `version_code` is an update, a lower
   one never, an equal one with a different version string is a rebuild,
   which carries a rolling channel on one code. `version_code` is required

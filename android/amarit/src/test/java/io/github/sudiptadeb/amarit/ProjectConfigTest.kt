@@ -13,7 +13,7 @@ class ProjectConfigTest {
     fun readsTheRepositoryFile() {
         val c = ProjectConfig.parse(File("../../amarit.json").readText())
         assertEquals("amarit", c.project)
-        assertTrue(c.releases.startsWith("https://github.com/sudiptadeb/amarit/"))
+        assertTrue(c.releases.startsWith("https://github.com/debkosh/amarit/"))
         assertTrue(c.autoUpdate)
         assertNull(c.intervalMs)
         assertNull(c.key)

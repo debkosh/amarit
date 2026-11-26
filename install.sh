@@ -1,14 +1,14 @@
 #!/bin/sh
 # Install the amarit binary from a GitHub release.
 #
-#   curl -fsSL https://raw.githubusercontent.com/sudiptadeb/amarit/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/debkosh/amarit/main/install.sh | sh
 #
 # AMARIT_VERSION=v0.6.0 pins a release (default: the latest).
 # AMARIT_INSTALL_DIR=/some/bin picks the directory (default: /usr/local/bin
 # when writable, else ~/.local/bin).
 set -eu
 
-REPO=sudiptadeb/amarit
+REPO=debkosh/amarit
 VERSION=${AMARIT_VERSION:-latest}
 
 say() { printf 'amarit: %s\n' "$*" >&2; }

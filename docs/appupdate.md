@@ -170,7 +170,7 @@ the system's own frameworks, not a dependency.
 A Flatpak updates through Flatpak's update portal, not amarit's manifest:
 the repository is signed, Flatpak downloads only what changed, and `/app`
 stays the deployment the app started from. `appupdate.Config.Source` takes
-`github.com/sudiptadeb/amarit/flatpak`, a module of its own on
+`github.com/debkosh/amarit/flatpak`, a module of its own on
 `godbus/dbus/v5`, and the shell sees the same State and sends the same
 commands.
 

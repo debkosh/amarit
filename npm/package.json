@@ -24,8 +24,8 @@
   "author": "Sudipta Deb",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sudiptadeb/amarit.git",
+    "url": "git+https://github.com/debkosh/amarit.git",
     "directory": "npm"
   },
-  "homepage": "https://github.com/sudiptadeb/amarit"
+  "homepage": "https://github.com/debkosh/amarit"
 }

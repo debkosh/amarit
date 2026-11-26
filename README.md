@@ -1,7 +1,7 @@
 # amarit
 
-[![ci](https://github.com/sudiptadeb/amarit/actions/workflows/ci.yml/badge.svg)](https://github.com/sudiptadeb/amarit/actions/workflows/ci.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/sudiptadeb/amarit.svg)](https://pkg.go.dev/github.com/sudiptadeb/amarit)
+[![ci](https://github.com/debkosh/amarit/actions/workflows/ci.yml/badge.svg)](https://github.com/debkosh/amarit/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/debkosh/amarit.svg)](https://pkg.go.dev/github.com/debkosh/amarit)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Keep it alive. Keep it current.**
@@ -22,7 +22,7 @@ and opens no ports. *Amar*: undying.
 **1. Install**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sudiptadeb/amarit/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/debkosh/amarit/main/install.sh | sh
 ```
 
 Or with npm: `npm install -g amarit`.
@@ -68,10 +68,10 @@ new version does not come up.
 }
 ```
 
-**2. Add one line** to `main` (after `go get github.com/sudiptadeb/amarit`):
+**2. Add one line** to `main` (after `go get github.com/debkosh/amarit`):
 
 ```go
-import "github.com/sudiptadeb/amarit"
+import "github.com/debkosh/amarit"
 
 func main() {
     amarit.Start()
@@ -213,14 +213,14 @@ is [docs/spec.md](docs/spec.md), and the reasoning behind the design is
 ## Install options
 
 The script detects macOS or Linux on amd64 or arm64, downloads the binary
-from the latest [release](https://github.com/sudiptadeb/amarit/releases),
+from the latest [release](https://github.com/debkosh/amarit/releases),
 checks it against `SHA256SUMS`, and installs it to `/usr/local/bin`, or
 `~/.local/bin` when that is not writable.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sudiptadeb/amarit/main/install.sh | AMARIT_VERSION=v0.6.0 sh       # a specific release
-curl -fsSL https://raw.githubusercontent.com/sudiptadeb/amarit/main/install.sh | AMARIT_INSTALL_DIR=~/bin sh     # a specific directory
-go install github.com/sudiptadeb/amarit/cmd/amarit@latest                                                        # from source, into ~/go/bin
+curl -fsSL https://raw.githubusercontent.com/debkosh/amarit/main/install.sh | AMARIT_VERSION=v0.6.0 sh       # a specific release
+curl -fsSL https://raw.githubusercontent.com/debkosh/amarit/main/install.sh | AMARIT_INSTALL_DIR=~/bin sh     # a specific directory
+go install github.com/debkosh/amarit/cmd/amarit@latest                                                        # from source, into ~/go/bin
 ```
 
 To remove it, stop your programs (`amarit stop <name>`), run `amarit
