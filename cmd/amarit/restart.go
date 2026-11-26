@@ -6,7 +6,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // settle is how long a rolling restart watches each unit before moving on.

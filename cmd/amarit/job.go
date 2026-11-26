@@ -22,7 +22,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // A job is a command run once, off the shell that started it: a build, a

@@ -14,7 +14,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // gh runs the GitHub CLI and returns its standard output; a variable so a

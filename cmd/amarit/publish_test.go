@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // fakeGitHub answers the gh commands publish runs, from releases in memory.

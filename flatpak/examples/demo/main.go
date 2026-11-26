@@ -17,9 +17,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
-	"github.com/sudiptadeb/amarit/appupdate"
-	"github.com/sudiptadeb/amarit/flatpak"
+	"github.com/debkosh/amarit"
+	"github.com/debkosh/amarit/appupdate"
+	"github.com/debkosh/amarit/flatpak"
 )
 
 // build is what this commit says it is, set with -ldflags, so the log shows

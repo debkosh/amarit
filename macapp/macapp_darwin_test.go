@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // fakeApp writes a bundle that says it is version, with a real executable

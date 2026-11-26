@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // Phase is where the updater is.

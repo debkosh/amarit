@@ -74,7 +74,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 var (

@@ -17,7 +17,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 const label = "com.amarit.daemon"
@@ -30,7 +30,7 @@ const label = "com.amarit.daemon"
 // release build also stamps the file in, and the two agree.
 const (
 	selfProject    = "amarit"
-	selfReleases   = "https://github.com/sudiptadeb/amarit/releases/latest/download/releases.json"
+	selfReleases   = "https://github.com/debkosh/amarit/releases/latest/download/releases.json"
 	selfAutoUpdate = true
 )
 

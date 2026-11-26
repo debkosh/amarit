@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // The daemon repeats amarit.json in code because embed cannot reach the

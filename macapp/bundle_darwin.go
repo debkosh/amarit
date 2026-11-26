@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // ErrOtherVersion is a bundle that says it is another version than the

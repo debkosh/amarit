@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sudiptadeb/amarit"
-	"github.com/sudiptadeb/amarit/relaunch"
+	"github.com/debkosh/amarit"
+	"github.com/debkosh/amarit/relaunch"
 )
 
 // Copies are the other running copies of the app sharing the state

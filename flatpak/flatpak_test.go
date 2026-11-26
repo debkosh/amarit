@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sudiptadeb/amarit/appupdate"
+	"github.com/debkosh/amarit/appupdate"
 )
 
 func TestLookReadsWhatTheMonitorHeard(t *testing.T) {

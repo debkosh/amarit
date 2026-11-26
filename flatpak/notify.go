@@ -3,7 +3,7 @@ package flatpak
 import (
 	"github.com/godbus/dbus/v5"
 
-	"github.com/sudiptadeb/amarit/appupdate"
+	"github.com/debkosh/amarit/appupdate"
 )
 
 const (

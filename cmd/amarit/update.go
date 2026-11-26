@@ -10,11 +10,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
-// amaritModule is how a binary built with the library shows in its build info.
-const amaritModule = "github.com/sudiptadeb/amarit"
+// amaritModules are how a binary built with the library shows in its build
+// info: its path since the move to the debkosh organisation, and the one the
+// programs already installed were built with.
+var amaritModules = map[string]bool{
+	"github.com/debkosh/amarit":    true,
+	"github.com/sudiptadeb/amarit": true,
+}
 
 // update brings units onto the version their releases.json points at. Each
 // program updates itself with its own `<binary> update`, which knows its
@@ -230,11 +235,11 @@ func builtWithAmarit(bin string) bool {
 	if err != nil {
 		return false
 	}
-	if bi.Main.Path == amaritModule {
+	if amaritModules[bi.Main.Path] {
 		return false // the amarit tool itself is not a unit's program
 	}
 	for _, d := range bi.Deps {
-		if d.Path == amaritModule {
+		if amaritModules[d.Path] {
 			return true
 		}
 	}

@@ -10,7 +10,7 @@ import (
 
 const goodConfig = `{
   "project": "termulaa",
-  "releases": "https://github.com/sudiptadeb/termulaa/releases/latest/download/releases.json",
+  "releases": "https://github.com/debkosh/termulaa/releases/latest/download/releases.json",
   "restart": "overlap",
   "interval": "5m",
   "auto_update": true,

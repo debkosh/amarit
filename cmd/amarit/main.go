@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 func main() {
@@ -201,7 +201,7 @@ func stamp(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("-X github.com/sudiptadeb/amarit.stampedProject=%s -X github.com/sudiptadeb/amarit.stampedVersion=%s\n",
+	fmt.Printf("-X github.com/debkosh/amarit.stampedProject=%s -X github.com/debkosh/amarit.stampedVersion=%s\n",
 		base64.StdEncoding.EncodeToString(raw), strings.TrimPrefix(*version, "v"))
 	return nil
 }

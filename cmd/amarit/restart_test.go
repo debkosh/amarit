@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 func TestMatchUnits(t *testing.T) {

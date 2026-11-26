@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // release serves a manifest whose stable channel names version, with asset

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // amaritProgram builds a program that imports the library, the way a
@@ -19,8 +19,8 @@ func amaritProgram(t *testing.T) string {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module demo\n\ngo 1.25\n\nrequire github.com/sudiptadeb/amarit v0.0.0\n\nreplace github.com/sudiptadeb/amarit => "+root+"\n"), 0o644)
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nimport \"github.com/sudiptadeb/amarit\"\n\nfunc main() { amarit.Start() }\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module demo\n\ngo 1.25\n\nrequire github.com/debkosh/amarit v0.0.0\n\nreplace github.com/debkosh/amarit => "+root+"\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nimport \"github.com/debkosh/amarit\"\n\nfunc main() { amarit.Start() }\n"), 0o644)
 	bin := filepath.Join(dir, "demo")
 	cmd := exec.Command("go", "build", "-o", bin, ".")
 	cmd.Dir = dir

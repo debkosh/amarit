@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // A rolling build is named so semver orders it after the release it follows,

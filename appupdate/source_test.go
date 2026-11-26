@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sudiptadeb/amarit"
+	"github.com/debkosh/amarit"
 )
 
 // source stands in for a Flatpak's update portal.

@@ -52,7 +52,7 @@ type ReleaseConfig struct {
 
 // Stamped by `amarit stamp` (or any build) with
 //
-//	-ldflags "-X github.com/sudiptadeb/amarit.stampedProject=<base64 amarit.json> -X github.com/sudiptadeb/amarit.stampedVersion=0.5.3"
+//	-ldflags "-X github.com/debkosh/amarit.stampedProject=<base64 amarit.json> -X github.com/debkosh/amarit.stampedVersion=0.5.3"
 //
 // so that the program needs no embed directive and no arguments.
 var (
